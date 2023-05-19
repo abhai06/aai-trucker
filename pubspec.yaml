@@ -50,6 +50,15 @@ dependencies:
   flutter_cache_manager: ^3.1.2
   flutter_bloc: ^8.1.2
   multi_image_picker: ^4.8.0
+  image_picker: ^0.8.7+4
+  google_fonts: ^4.0.4
+  timeline_tile: ^2.0.0
+  flutter_signature_pad: ^3.0.1
+  camera: ^0.10.5
+  dashed_path: ^1.0.1
+  phone_call: ^0.0.1
+  geolocator: ^9.0.2
+  permission_handler: ^10.2.0
 
 dev_dependencies:
   flutter_test:

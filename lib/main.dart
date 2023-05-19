@@ -1,4 +1,4 @@
-import 'package:drive/main_screen.dart';
+import 'package:drive/login.dart';
 import 'package:flutter/material.dart';
 import 'package:drive/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,12 +8,16 @@ import 'package:connectivity/connectivity.dart';
 import 'package:drive/helper/db_helper.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'dart:convert';
+// import 'package:path_provider/path_provider.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
+
+import 'dart:io';
 
 void main() async {
-  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
-  DBHelper().initDB();
-  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
   runApp(const MyApp());
+  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 }
 
 class MyApp extends StatefulWidget {
@@ -29,38 +33,76 @@ class _MyAppState extends State<MyApp> {
   bool isLoggedIn = false;
   List runsheetList = [];
   List bookingList = [];
+  final bool _isDarkMode = false;
+  bool isDatabaseInitialized = false;
 
+  final ThemeData kLightTheme = ThemeData(
+    appBarTheme: const AppBarTheme(
+      color: Colors.red, // Set the app bar color to blue
+    ),
+    brightness: Brightness.light,
+    // primarySwatch: Colors.blue,
+  );
+
+  final ThemeData kDarkTheme = ThemeData(
+    appBarTheme: const AppBarTheme(
+      color: Colors.red, // Set the app bar color to blue
+    ),
+    brightness: Brightness.dark,
+    // primarySwatch: Colors.blue,
+  );
+  bool isDarkMode = false;
   @override
   void initState() {
     super.initState();
-    checkLoginStatus();
     initialization();
+    openDatabaseOrInitialize();
+    checkLoggedIn();
   }
 
-  void initialization() {
+  void openDatabaseOrInitialize() async {
+    String databasePath = await getDatabasesPath();
+    String databaseName = 'trams.db';
+    String path = join(databasePath, databaseName);
+
+    bool isdbexists = await databaseExists(path);
+    if (isdbexists == false) {
+      await dbHelper.initDB();
+    }
+  }
+
+  Future<bool> databaseExists(String path) async {
+    return File(path).exists();
+  }
+
+  void initialization() async {
     FlutterNativeSplash.remove();
   }
 
-  void checkLoginStatus() async {
-    var data = {
-      'username': 'jewome',
-      'password': '12345678',
-    };
-
-    var res = await apiService.postData(data, 'login');
-    if (res['success']) {
-      final prefs = await SharedPreferences.getInstance();
-      prefs.setString('token', res['data']['api_token']);
-      exception();
-      tasklist();
-      runsheet();
-    } else {
-      print(res['message']);
+  void checkLoggedIn() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    final authToken = prefs.getString('token');
+    isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+    if (isLoggedIn) {
+      final data = await dbHelper.getAll('runsheet');
+      final booking = await dbHelper.getAll('booking');
+      if (data.isEmpty || booking.isEmpty) {
+        exception();
+        tasklist();
+        runsheet();
+      }
     }
-    // SharedPreferences prefs = await SharedPreferences.getInstance();
-    // isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-
-    setState(() {});
+    // else {
+    //   SharedPreferences prefs = await SharedPreferences.getInstance();
+    //   await prefs.clear();
+    //   setState(() {
+    //     Navigator.pushAndRemoveUntil(
+    //       context as BuildContext,
+    //       MaterialPageRoute(builder: (context) => LoginPage()),
+    //       (Route<dynamic> route) => false,
+    //     );
+    //   });
+    // }
   }
 
   Future<bool> checkInternetConnection() async {
@@ -88,6 +130,7 @@ class _MyAppState extends State<MyApp> {
         });
         return {
           'id': rn['id'],
+          'runsheet_id': rn['id'],
           'cbm': rn['cbm'],
           'charging_type': rn['charging_type'],
           'date_from': rn['date_from'],
@@ -165,12 +208,8 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-        theme: ThemeData(
-          primarySwatch: Colors.red,
-          visualDensity: VisualDensity.adaptivePlatformDensity,
-        ),
-        home: const MainScreen()
-        // isLoggedIn ? HomePage() : LoginPage(),
+        theme: isDarkMode ? kDarkTheme : kLightTheme, home: const LoginPage()
+        // home: isLoggedIn ? WelcomePage() : LoginPage(),
         );
   }
 }
