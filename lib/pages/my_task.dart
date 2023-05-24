@@ -108,7 +108,8 @@ class _MyTaskPageState extends State<MyTaskPage> {
                       itemCount: task.length,
                       itemBuilder: (context, index) {
                         final item = task[index];
-                        DateTime dateTime = DateTime.parse(item['updated_at']);
+                        DateTime dateTime =
+                            DateTime.parse(item['updated_at'] ?? '');
                         final formattedDateTime =
                             DateFormat('MMM d,yyyy h:mm a').format(dateTime);
                         return Card(
@@ -116,7 +117,7 @@ class _MyTaskPageState extends State<MyTaskPage> {
                             elevation: 4,
                             child: ListTile(
                               onTap: () async {
-                                await _getRecordById(item['id']);
+                                await _getRecordById(item['id'] ?? 0);
                                 setState(() {
                                   Navigator.push(
                                       context,
@@ -128,7 +129,7 @@ class _MyTaskPageState extends State<MyTaskPage> {
                               leading: const Icon(Icons.local_shipping,
                                   color: Colors.red),
                               title: Text(
-                                item['reference'],
+                                item['reference'] ?? '',
                                 style: const TextStyle(
                                     fontWeight: FontWeight.bold),
                               ),
@@ -154,7 +155,7 @@ class _MyTaskPageState extends State<MyTaskPage> {
                                           fontWeight: FontWeight.bold),
                                     ),
                                     Text(
-                                      item['remarks'],
+                                      item['remarks'] ?? '',
                                       style: const TextStyle(
                                           fontSize: 12,
                                           overflow: TextOverflow.ellipsis,
@@ -181,23 +182,23 @@ class _MyTaskPageState extends State<MyTaskPage> {
                                       ),
                                     ),
                                   ),
-                                  Container(
-                                    margin: const EdgeInsets.only(left: 5),
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.red,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      item['charging_type'].toUpperCase() ?? '',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
+                                  // Container(
+                                  //   margin: const EdgeInsets.only(left: 5),
+                                  //   padding: const EdgeInsets.symmetric(
+                                  //       horizontal: 8, vertical: 2),
+                                  //   decoration: BoxDecoration(
+                                  //     color: Colors.red,
+                                  //     borderRadius: BorderRadius.circular(20),
+                                  //   ),
+                                  //   child: Text(
+                                  //     item['charging_type'].toUpperCase() ?? '',
+                                  //     style: const TextStyle(
+                                  //       fontSize: 12,
+                                  //       fontWeight: FontWeight.bold,
+                                  //       color: Colors.white,
+                                  //     ),
+                                  //   ),
+                                  // ),
                                 ],
                               ),
                             ));

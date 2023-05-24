@@ -26,13 +26,22 @@ class _BookingDetailState extends State<BookingDetailPage> {
     final totalCbm = widget.item['total_cbm'] ?? '';
     final totalQty = widget.item['total_qty'] ?? '';
     final totalWt = widget.item['total_wt'] ?? '';
+    final TextEditingController item_height =
+        TextEditingController(text: widget.item['item_height'].toString());
+    final TextEditingController item_length =
+        TextEditingController(text: widget.item['item_length'].toString());
+    final TextEditingController item_width =
+        TextEditingController(text: widget.item['item_width'].toString());
+    final item_cbm = widget.item['item_cbm'] ?? '';
+    final TextEditingController item_qty =
+        TextEditingController(text: widget.item['item_qty'].toString());
+    final item_weight = widget.item['item_weight'] ?? '';
     final String tripType = widget.item['trip_type'] ?? '';
 
     final TextEditingController actualQty =
-        TextEditingController(text: widget.item['total_qty']);
-    final TextEditingController qty =
-        TextEditingController(text: widget.item['total_qty']);
+        TextEditingController(text: widget.item['item_qty'].toString());
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: const Text('Booking Details'), actions: [
         Builder(builder: (context) {
           return IconButton(
@@ -83,7 +92,7 @@ class _BookingDetailState extends State<BookingDetailPage> {
                         mainAxisAlignment: MainAxisAlignment.start,
                         children: [
                           ListTile(
-                            // leading: const Icon(Icons.person),
+                            leading: const Icon(Icons.person),
                             title: const Text(
                               'Customer',
                               style: TextStyle(
@@ -108,6 +117,7 @@ class _BookingDetailState extends State<BookingDetailPage> {
                           ),
                           const Divider(),
                           ListTile(
+                            leading: Icon(Icons.location_on),
                             title: const Text(
                               'Pick Up',
                               style: TextStyle(
@@ -145,7 +155,7 @@ class _BookingDetailState extends State<BookingDetailPage> {
                                               CrossAxisAlignment.start,
                                           children: [
                                             TextField(
-                                              controller: qty,
+                                              controller: item_qty,
                                               readOnly: true,
                                               decoration: const InputDecoration(
                                                 labelText: 'Qty',
@@ -188,9 +198,9 @@ class _BookingDetailState extends State<BookingDetailPage> {
                           ),
                           const Divider(),
                           ListTile(
-                            // leading: const Icon(
-                            //   Icons.pin_drop,
-                            // ),
+                            leading: const Icon(
+                              Icons.pin_drop,
+                            ),
                             title: const Text(
                               'Delivery',
                               style: TextStyle(
@@ -227,7 +237,7 @@ class _BookingDetailState extends State<BookingDetailPage> {
                                             CrossAxisAlignment.start,
                                         children: [
                                           TextField(
-                                            controller: qty,
+                                            controller: item_qty,
                                             readOnly: true,
                                             decoration: const InputDecoration(
                                               labelText: 'Qty',
@@ -271,11 +281,84 @@ class _BookingDetailState extends State<BookingDetailPage> {
                           ),
                           const Divider(),
                           ListTile(
-                              // leading: const Icon(
-                              //   Icons.integration_instructions,
-                              // ),
+                              leading: const Icon(
+                                Icons.view_in_ar,
+                              ),
+                              title: const Text(
+                                'Item Details',
+                                style: TextStyle(
+                                    fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        TextField(
+                                          controller: item_height,
+                                          readOnly: true,
+                                          decoration: const InputDecoration(
+                                            labelText: 'Length',
+                                          ),
+                                          style: const TextStyle(fontSize: 11),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(
+                                    width: 10.0,
+                                    height: 10.0,
+                                  ),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        TextField(
+                                          controller: item_length,
+                                          readOnly: true,
+                                          keyboardType: TextInputType.text,
+                                          decoration: const InputDecoration(
+                                            labelText: 'Width',
+                                          ),
+                                          style: const TextStyle(fontSize: 11),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(
+                                    width: 10.0,
+                                    height: 10.0,
+                                  ),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        TextField(
+                                          controller: item_width,
+                                          readOnly: true,
+                                          keyboardType: TextInputType.text,
+                                          decoration: const InputDecoration(
+                                            labelText: 'Height',
+                                          ),
+                                          style: const TextStyle(fontSize: 11),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              )),
+                          const Divider(),
+                          ListTile(
+                              leading: const Icon(
+                                Icons.text_snippet,
+                              ),
                               title: const Text(
                                 'Remarks / Special Instruction',
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                     fontSize: 12, fontWeight: FontWeight.bold),
                               ),

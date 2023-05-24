@@ -73,27 +73,24 @@ class _MainScreenState extends State<MainScreen> {
     return Theme(
         data: isDarkMode ? kDarkTheme : kLightTheme,
         child: Scaffold(
-          appBar: AppBar(
-            title: Text(currentPageTitle),
-            // actions: [
-            //   Builder(builder: (context) {
-            //     if (_currentIndex == 0) {
-            //       return IconButton(
-            //         icon: const Icon(Icons.sync),
-            //         onPressed: () async {
-            // await runsheet();
-            // await tasklist();
-            // await exception();
-            // final res = await dbHelper.getAll('exception');
-            // print(res);
-            //         },
-            //       );
-            //     } else {
-            //       return Container();
-            //     }
-            //   })
-            // ]
-          ),
+          appBar: AppBar(title: Text(currentPageTitle), actions: [
+            Builder(builder: (context) {
+              if (_currentIndex == 0) {
+                return IconButton(
+                  icon: const Icon(Icons.sync),
+                  onPressed: () async {
+                    // await runsheet();
+                    // await tasklist();
+                    // await exception();
+                    // final res = await dbHelper.getAll('exception');
+                    // print(res);
+                  },
+                );
+              } else {
+                return Container();
+              }
+            })
+          ]),
           drawer: Drawer(
             child: ListView(
               children: <Widget>[

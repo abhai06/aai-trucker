@@ -21,7 +21,7 @@ class _TimelineState extends State<Timeline> {
       isLoading = true;
     });
     final log = await dbHelper.getAll('booking_logs',
-        whereCondition: 'source_id=?', whereArgs: [widget.item['id']]);
+        whereCondition: 'source_id=?', whereArgs: [widget.item['source_id']]);
     events = log;
     setState(() {
       isLoading = false;
