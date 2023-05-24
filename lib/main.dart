@@ -1,4 +1,6 @@
+import 'package:drive/home.dart';
 import 'package:drive/login.dart';
+import 'package:drive/maps/maps.dart';
 import 'package:flutter/material.dart';
 import 'package:drive/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -208,7 +210,7 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-        theme: isDarkMode ? kDarkTheme : kLightTheme, home: const LoginPage()
+        theme: isDarkMode ? kDarkTheme : kLightTheme, home: LoginPage()
         // home: isLoggedIn ? WelcomePage() : LoginPage(),
         );
   }

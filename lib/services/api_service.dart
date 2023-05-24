@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  final String baseUrl = 'http://192.168.39.176:8000/api/v1';
+  final String baseUrl = 'http://192.168.200.116:8000/api/v1';
   postData(data, apiUrl) async {
     var response = await http.post(Uri.parse('$baseUrl/$apiUrl'),
         body: jsonEncode(data), headers: _setHeaders());
@@ -58,7 +58,6 @@ class ApiService {
   }) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     final String? bearerToken = prefs.getString('token');
-
     final headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',

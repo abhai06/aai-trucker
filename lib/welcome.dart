@@ -31,7 +31,11 @@ class _WelcomePageState extends State<WelcomePage> {
         driver = json.decode(userdata!);
       });
       final task = await dbHelper.getAll('tasks');
+      print(task);
+
       final except = await dbHelper.getAll('exception');
+      print(except);
+
       if (task.isEmpty || except.isEmpty) {
         exception();
         tasklist();
@@ -112,7 +116,7 @@ class _WelcomePageState extends State<WelcomePage> {
           'task': tks['task']
         };
       }).toList();
-      await dbHelper.save('tasks', task);
+      await dbHelper.save('tasks', task, pkey: 'code');
     } else {
       print('Error: ${response.reasonPhrase}');
     }
@@ -120,10 +124,11 @@ class _WelcomePageState extends State<WelcomePage> {
 
   Future<void> exception() async {
     await dbHelper.truncateTable('exception');
-    final response = await apiService.getData('exception_actions');
+    final response =
+        await apiService.getData('exception_actions', params: {'page': 0});
     if (response.statusCode == 200) {
       final responseData = json.decode(response.body);
-      var data = responseData['data'];
+      var data = responseData['data']['data'];
       List except = data.map((tks) {
         return {
           'code': tks['code'],
@@ -132,7 +137,7 @@ class _WelcomePageState extends State<WelcomePage> {
           'task_id': tks['task_id']
         };
       }).toList();
-      await dbHelper.save('exception', except);
+      await dbHelper.save('exception', except, pkey: 'code');
     } else {
       print('Error: ${response.reasonPhrase}');
     }
@@ -150,12 +155,15 @@ class _WelcomePageState extends State<WelcomePage> {
   @override
   void initState() {
     super.initState();
+    // exception();
     _simulateLoading();
+    // user_info();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+        resizeToAvoidBottomInset: false,
         body: _isLoading
             ? Center(
                 child: Lottie.asset(
