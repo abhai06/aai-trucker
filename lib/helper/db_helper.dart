@@ -34,22 +34,52 @@ class DBHelper {
     await db.execute(
         'CREATE TABLE exception (id INTEGER PRIMARY KEY, code TEXT, name TEXT, description TEXT, task_id INTEGER)');
     await db.execute(
-        'CREATE TABLE runsheet (id INTEGER PRIMARY KEY, cbm REAL, charging_type TEXT, date_from TEXT, date_to TEXT, dr_no TEXT, est_tot_cbm REAL, est_tot_pcs INTEGER, est_tot_wt REAL, from_loc TEXT, plate_no TEXT, reference TEXT, remarks TEXT, status TEXT, task TEXT, to_loc TEXT, total_pcs INTEGER, total_wt REAL, tracking_no TEXT, trucking_id TEXT, updated_at TEXT, user_id INTEGER, vehicle_id INTEGER, vehicle_type TEXT )');
+        'CREATE TABLE runsheet (id INTEGER PRIMARY KEY, runsheet_id INTEGER ,monitor_id INTEGER, cbm REAL, charging_type TEXT, date_from TEXT, date_to TEXT, ar_no TEXT, dr_no TEXT, est_tot_cbm REAL, est_tot_pcs INTEGER, est_tot_wt REAL, from_loc TEXT, plate_no TEXT, reference TEXT, remarks TEXT, status TEXT, task TEXT, to_loc TEXT, total_pcs INTEGER, total_wt REAL, tracking_no TEXT, trucking_id TEXT, updated_at TEXT, user_id INTEGER, vehicle_id INTEGER, vehicle_type TEXT )');
     await db.execute(
-        'CREATE TABLE booking (id INTEGER PRIMARY KEY, customer TEXT,remarks TEXT,item_details INTEGER,pickup_loc TEXT,delivery_loc TEXT,reference TEXT,service_type TEXT,total_cbm REAL,total_qty TEXT,total_wt INTEGER,trip_type TEXT , status TEXT, sequence_no INTEGER)');
+        'CREATE TABLE booking (id INTEGER PRIMARY KEY, source_id INTEGER, runsheet_id INTEGER, address TEXT, customer_contact TEXT, task TEXT, customer TEXT, remarks TEXT, item_details INTEGER, pickup_loc TEXT,delivery_loc TEXT,reference TEXT,service_type TEXT, item_cbm REAL, item_height REAL, item_length REAL, item_width REAL, item_qty INTEGER, item_weight INTEGER,trip_type TEXT , status TEXT, sequence_no INTEGER, fixed TEXT)');
 
     await db.execute(
-        'CREATE TABLE booking_logs (id INTEGER PRIMARY KEY, task TEXT, task_code TEXT, location TEXT, contact_person TEXT, datetime TEXT, note TEXT, attachment TEXT, line_id INTEGER, source_id INTEGER, task_id INTEGER, task_exception TEXT)');
+        'CREATE TABLE booking_logs (id INTEGER PRIMARY KEY, task TEXT, task_code TEXT, location TEXT, contact_person TEXT, datetime TEXT, note TEXT, attachment TEXT, line_id INTEGER, source_id INTEGER, task_id INTEGER, task_exception TEXT, signature BLOB)');
   }
 
-  save(String table, data) async {
-    var dbClient = await db;
-    // var result = await dbClient.insert(table, item);
-    for (var item in data) {
-      await dbClient.insert(table, item,
-          conflictAlgorithm: ConflictAlgorithm.replace);
+  save(String table, data, {String? pkey}) async {
+    try {
+      var dbClient = await db;
+      for (var item in data) {
+        final record = await dbClient
+            .query(table, where: '$pkey = ?', whereArgs: [item[pkey]]);
+        if (record.isNotEmpty) {
+          await dbClient
+              .update(table, item, where: '$pkey = ?', whereArgs: [item[pkey]]);
+        } else {
+          await dbClient.insert(table, item,
+              conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+      }
+    } catch (e) {
+      print('Error on saving : $e');
     }
-    // return result;
+  }
+
+  saveBooking(String table, data) async {
+    try {
+      var dbClient = await db;
+      for (var item in data) {
+        final record = await dbClient.query(table,
+            where: 'source_id = ? AND task = ?',
+            whereArgs: [item['source_id'], item['task']]);
+        if (record.isNotEmpty) {
+          await dbClient.update(table, item,
+              where: 'source_id = ? AND task = ?',
+              whereArgs: [item['source_id'], item['task']]);
+        } else {
+          await dbClient.insert(table, item,
+              conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+      }
+    } catch (e) {
+      print('Error on saving : $e');
+    }
   }
 
   Future<List<Map<String, dynamic>>> getAll(String table,

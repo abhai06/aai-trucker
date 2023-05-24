@@ -10,6 +10,9 @@ class ExceptionPage extends StatefulWidget {
 class _ExceptionPageState extends State<ExceptionPage> {
   DBHelper dbHelper = DBHelper();
   List data = [];
+  String? selectedValue;
+  final TextEditingController note = TextEditingController();
+
   Future<void> exception() async {
     final List<Map<String, dynamic>> rows = await dbHelper.getAll('exception');
     setState(() {
@@ -23,39 +26,83 @@ class _ExceptionPageState extends State<ExceptionPage> {
     exception();
   }
 
+  setSelectedRadioTile(val) {
+    setState(() {
+      selectedValue = val;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    int selectedValue = 0;
     return Scaffold(
-        appBar: AppBar(title: const Text('Exception'), actions: [
-          Builder(builder: (context) {
-            return IconButton(
-              icon: const Icon(
-                Icons.map,
-                color: Colors.green,
-              ),
-              onPressed: () {
-                // Navigator.push(context,
-                //     MaterialPageRoute(builder: (context) => const MapPage()));
-              },
-            );
-          })
-        ]),
-        body: Column(
-          children: data
-              .map((option) => RadioListTile<int>(
-                    title: Text(
-                      option['name'].toUpperCase(),
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+        appBar: AppBar(
+          title: const Text('Exception'),
+          // actions: [
+          //   Builder(builder: (context) {
+          //     return IconButton(
+          //       icon: const Icon(
+          //         Icons.map,
+          //         color: Colors.green,
+          //       ),
+          //       onPressed: () {
+          //         // Navigator.push(context,
+          //         //     MaterialPageRoute(builder: (context) => const MapPage()));
+          //       },
+          //     );
+          //   })
+          // ]
+        ),
+        body: SingleChildScrollView(
+          child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              // crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Column(
+                  children: data.map((option) {
+                    return RadioListTile<String>(
+                      title: Text(
+                        option['name'].toUpperCase(),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Text(option['description']),
+                      value: option['name'],
+                      groupValue: selectedValue,
+                      activeColor: Colors.red,
+                      onChanged: (value) {
+                        setState(() {
+                          setSelectedRadioTile(value);
+                        });
+                      },
+                      selected: selectedValue == option['name'],
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 8.0),
+                Padding(
+                    padding: const EdgeInsets.only(left: 23.0, right: 16.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        TextField(
+                          controller: note,
+                          decoration: const InputDecoration(
+                              labelText: 'Remarks',
+                              border: OutlineInputBorder(),
+                              hintText: 'Enter Remarks'),
+                        ),
+                      ],
+                    )),
+                const SizedBox(height: 16.0),
+                ElevatedButton(
+                    style: ButtonStyle(
+                      backgroundColor:
+                          MaterialStateProperty.all<Color>(Colors.red),
                     ),
-                    subtitle: Text(option['description']),
-                    value: option['id'],
-                    groupValue: selectedValue,
-                    onChanged: (value) {
+                    child: const Text('SUBMIT'),
+                    onPressed: () {
                       setState(() {});
-                    },
-                  ))
-              .toList(),
+                    }),
+              ]),
         ));
   }
 }

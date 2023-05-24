@@ -1,4 +1,3 @@
-
 import 'package:drive/maps/map.dart';
 import 'package:flutter/material.dart';
 
@@ -11,17 +10,23 @@ class BookingDetailPage extends StatefulWidget {
 
 class _BookingDetailState extends State<BookingDetailPage> {
   @override
+  void initState() {
+    super.initState();
+    print(widget.item);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final String reference = widget.item['reference'];
-    final String customer = widget.item['customer'];
-    final String remarks = widget.item['remarks'];
-    final String pickupLoc = widget.item['pickup_loc'];
-    final String deliveryLoc = widget.item['delivery_loc'];
-    final String serviceType = widget.item['service_type'];
-    final totalCbm = widget.item['total_cbm'];
-    final totalQty = widget.item['total_qty'];
-    final totalWt = widget.item['total_wt'];
-    final String tripType = widget.item['trip_type'];
+    final String reference = widget.item['reference'] ?? '';
+    final String customer = widget.item['customer'] ?? '';
+    final String remarks = widget.item['remarks'] ?? '';
+    final String pickupLoc = widget.item['pickup_loc'] ?? '';
+    final String deliveryLoc = widget.item['delivery_loc'] ?? '';
+    final String serviceType = widget.item['service_type'] ?? '';
+    final totalCbm = widget.item['total_cbm'] ?? '';
+    final totalQty = widget.item['total_qty'] ?? '';
+    final totalWt = widget.item['total_wt'] ?? '';
+    final String tripType = widget.item['trip_type'] ?? '';
 
     final TextEditingController actualQty =
         TextEditingController(text: widget.item['total_qty']);
@@ -36,8 +41,8 @@ class _BookingDetailState extends State<BookingDetailPage> {
               color: Colors.green,
             ),
             onPressed: () {
-              Navigator.push(
-                  context, MaterialPageRoute(builder: (context) => const MapPage()));
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (context) => const MapPage()));
             },
           );
         })
@@ -103,9 +108,6 @@ class _BookingDetailState extends State<BookingDetailPage> {
                           ),
                           const Divider(),
                           ListTile(
-                            // leading: const Icon(
-                            //   Icons.mode_standby,
-                            // ),
                             title: const Text(
                               'Pick Up',
                               style: TextStyle(
@@ -169,7 +171,8 @@ class _BookingDetailState extends State<BookingDetailPage> {
                                               decoration: const InputDecoration(
                                                 labelText: 'Actual Qty',
                                               ),
-                                              style: const TextStyle(fontSize: 11),
+                                              style:
+                                                  const TextStyle(fontSize: 11),
                                             ),
                                           ],
                                         ),
@@ -250,7 +253,8 @@ class _BookingDetailState extends State<BookingDetailPage> {
                                             decoration: const InputDecoration(
                                               labelText: 'Actual Qty',
                                             ),
-                                            style: const TextStyle(fontSize: 11),
+                                            style:
+                                                const TextStyle(fontSize: 11),
                                           ),
                                         ],
                                       ),
@@ -286,24 +290,24 @@ class _BookingDetailState extends State<BookingDetailPage> {
           ),
         ),
       ),
-      floatingActionButton: Container(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Expanded(
-              child: FloatingActionButton.extended(
-                onPressed: () {
-                  // Add your onPressed logic here
-                },
-                label: const Text('Mark as Pick Up'),
-                icon: const Icon(Icons.east),
-              ),
-            ),
-          ],
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      // floatingActionButton: Container(
+      //   padding: const EdgeInsets.all(16.0),
+      //   child: Row(
+      //     mainAxisAlignment: MainAxisAlignment.center,
+      //     children: <Widget>[
+      //       Expanded(
+      //         child: FloatingActionButton.extended(
+      //           onPressed: () {
+      //             // Add your onPressed logic here
+      //           },
+      //           label: const Text('Mark as Pick Up'),
+      //           icon: const Icon(Icons.east),
+      //         ),
+      //       ),
+      //     ],
+      //   ),
+      // ),
+      // floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 }
