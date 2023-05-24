@@ -43,8 +43,8 @@ class DBHelper {
   }
 
   save(String table, data, {String? pkey}) async {
+    var dbClient = await db;
     try {
-      var dbClient = await db;
       for (var item in data) {
         final record = await dbClient
             .query(table, where: '$pkey = ?', whereArgs: [item[pkey]]);
@@ -62,8 +62,8 @@ class DBHelper {
   }
 
   saveBooking(String table, data) async {
+    var dbClient = await db;
     try {
-      var dbClient = await db;
       for (var item in data) {
         final record = await dbClient.query(table,
             where: 'source_id = ? AND task = ?',
@@ -86,11 +86,15 @@ class DBHelper {
       {String? whereCondition, List<dynamic>? whereArgs}) async {
     var dbClient = await db;
     List<Map<String, Object?>> result = [];
-    if (whereCondition != null) {
-      result = await dbClient.query(table,
-          where: whereCondition, whereArgs: whereArgs);
-    } else {
-      result = await dbClient.query(table);
+    try {
+      if (whereCondition != null) {
+        result = await dbClient.query(table,
+            where: whereCondition, whereArgs: whereArgs);
+      } else {
+        result = await dbClient.query(table);
+      }
+    } catch (e) {
+      print(e);
     }
     return result.toList();
   }
@@ -103,10 +107,14 @@ class DBHelper {
 
   Future<Map<String, dynamic>?> getById(String table, int id) async {
     var dbClient = await db;
-    var result =
-        await dbClient.query(table, where: 'id = ?', whereArgs: [id], limit: 1);
-    if (result.isEmpty) return null;
-    return result.first;
+    try {
+      var result = await dbClient.query(table,
+          where: 'id = ?', whereArgs: [id], limit: 1);
+      if (result.isEmpty) return null;
+      return result.first;
+    } catch (e) {
+      print(e);
+    }
   }
 
   Future<int> update(String table, Map<String, dynamic> item, int id) async {

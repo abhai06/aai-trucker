@@ -42,7 +42,7 @@ dependencies:
   latlong2: ^0.8.1
   flutter_map_marker_popup: ^4.0.2
   flutter_polyline_points: ^1.0.0
-  google_maps_flutter: ^2.2.5
+  google_maps_flutter: ^2.2.7
   basic_utils: ^5.5.4
   connectivity: ^3.0.6
   sqflite: ^2.2.7
@@ -59,6 +59,10 @@ dependencies:
   phone_call: ^0.0.1
   geolocator: ^9.0.2
   permission_handler: ^10.2.0
+  location: ^4.4.0
+  google_maps_webservice: ^0.0.20-nullsafety.5
+  geocoding: ^2.0.0
+
 
 dev_dependencies:
   flutter_test:
@@ -83,6 +87,7 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
+    - icons/
     - assets/images/
     - assets/animations/
 

@@ -25,6 +25,7 @@ class _LoginPageState extends State<LoginPage> {
   final bool _isLoading = false;
   final bool _loginSuccess = false;
   late AnimationController _animationController;
+  bool _showClearIcon = false;
 
   @override
   void initState() {
@@ -33,14 +34,26 @@ class _LoginPageState extends State<LoginPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       checkConnectivity(context);
     });
+
+    _usernameController.addListener(() {
+      setState(() {
+        _showClearIcon = _usernameController.text.isNotEmpty;
+      });
+    });
   }
 
   @override
   void dispose() {
-    // Clean up the focus node when the Form is disposed.
     textFieldFocusNode.dispose();
-
+    _usernameController.dispose();
     super.dispose();
+  }
+
+  void _clearText() {
+    setState(() {
+      _usernameController.clear();
+      _showClearIcon = false;
+    });
   }
 
   _showMsg(msg) {
@@ -144,65 +157,105 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
         resizeToAvoidBottomInset: false,
-        body: Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Image(
-                  image: AssetImage('assets/images/aai.png'),
-                  height: 70,
-                  width: 70,
-                ),
-                SizedBox(height: 60.0),
-                TextField(
-                  controller: _usernameController,
-                  keyboardType: TextInputType.text,
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(90.0),
+        body: Container(
+            decoration: BoxDecoration(
+                image: DecorationImage(
+              image: AssetImage('assets/images/maps.jpg'),
+              fit: BoxFit.cover,
+            )),
+            child: Padding(
+                padding: EdgeInsets.all(12.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Image(
+                      image: AssetImage('assets/images/aai.png'),
+                      height: 70,
+                      width: 70,
                     ),
-                    labelText: 'Username',
-                    prefixIcon: const Icon(Icons.person, size: 24),
-                  ),
-                ),
-                SizedBox(height: 16.0),
-                TextField(
-                  controller: _passwordController,
-                  keyboardType: TextInputType.visiblePassword,
-                  obscureText: _obscured,
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(90.0),
+                    SizedBox(height: 60.0),
+                    TextField(
+                      style: TextStyle(
+                          color: Colors.black, fontWeight: FontWeight.bold),
+                      controller: _usernameController,
+                      keyboardType: TextInputType.text,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(90.0),
+                        ),
+                        // filled: true,
+                        // fillColor: Colors.grey.shade300,
+                        labelText: 'Username',
+                        labelStyle: TextStyle(color: Colors.black),
+                        prefixIcon: const Icon(Icons.person, size: 24),
+                        prefixIconColor: Colors.black,
+                        enabledBorder: OutlineInputBorder(
+                          borderSide:
+                              BorderSide(color: Colors.black, width: 2.0),
+                          borderRadius: BorderRadius.circular(70.0),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.red, width: 2.0),
+                          borderRadius: BorderRadius.circular(70.0),
+                        ),
+                        suffixIcon: _showClearIcon
+                            ? IconButton(
+                                icon: Icon(Icons.clear),
+                                onPressed: _clearText,
+                              )
+                            : null,
+                      ),
                     ),
-                    labelText: 'Password',
-                    prefixIcon: const Icon(Icons.lock_rounded, size: 24),
-                    suffixIcon: Padding(
-                      padding: const EdgeInsets.fromLTRB(0, 0, 4, 0),
-                      child: GestureDetector(
-                        onTap: _toggleObscured,
-                        child: Icon(
-                          _obscured
-                              ? Icons.visibility_off_rounded
-                              : Icons.visibility_rounded,
-                          size: 24,
+                    SizedBox(height: 16.0),
+                    TextField(
+                      controller: _passwordController,
+                      keyboardType: TextInputType.visiblePassword,
+                      style: TextStyle(
+                          color: Colors.black, fontWeight: FontWeight.bold),
+                      obscureText: _obscured,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(90.0),
+                        ),
+                        labelText: 'Password',
+                        labelStyle: TextStyle(color: Colors.black),
+                        prefixIcon: const Icon(Icons.lock_rounded, size: 24),
+                        suffixIcon: Padding(
+                          padding: const EdgeInsets.fromLTRB(0, 0, 4, 0),
+                          child: GestureDetector(
+                            onTap: _toggleObscured,
+                            child: Icon(
+                                _obscured
+                                    ? Icons.visibility_off_rounded
+                                    : Icons.visibility_rounded,
+                                size: 24,
+                                color: Colors.black),
+                          ),
+                        ),
+                        prefixIconColor: Colors.black,
+                        enabledBorder: OutlineInputBorder(
+                          borderSide:
+                              BorderSide(color: Colors.black, width: 2.0),
+                          borderRadius: BorderRadius.circular(70.0),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.red, width: 2.0),
+                          borderRadius: BorderRadius.circular(70.0),
                         ),
                       ),
                     ),
-                  ),
-                ),
-                SizedBox(height: 24.0),
-                ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color.fromRGBO(179, 58, 58, 1),
-                        minimumSize: const Size.fromHeight(50),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        )),
-                    onPressed: _login,
-                    child: const Text('SIGN IN'))
-              ],
-            )));
+                    SizedBox(height: 24.0),
+                    ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: Color.fromARGB(255, 222, 8, 8),
+                            minimumSize: const Size.fromHeight(50),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            )),
+                        onPressed: _login,
+                        child: const Text('SIGN IN'))
+                  ],
+                ))));
   }
 }

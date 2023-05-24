@@ -15,6 +15,7 @@ class _ExceptionPageState extends State<ExceptionPage> {
 
   Future<void> exception() async {
     final List<Map<String, dynamic>> rows = await dbHelper.getAll('exception');
+    print(rows);
     setState(() {
       data = rows;
     });
@@ -36,21 +37,7 @@ class _ExceptionPageState extends State<ExceptionPage> {
   Widget build(BuildContext context) {
     return Scaffold(
         appBar: AppBar(
-          title: const Text('Exception'),
-          // actions: [
-          //   Builder(builder: (context) {
-          //     return IconButton(
-          //       icon: const Icon(
-          //         Icons.map,
-          //         color: Colors.green,
-          //       ),
-          //       onPressed: () {
-          //         // Navigator.push(context,
-          //         //     MaterialPageRoute(builder: (context) => const MapPage()));
-          //       },
-          //     );
-          //   })
-          // ]
+          title: const Text('Irregularities'),
         ),
         body: SingleChildScrollView(
           child: Column(

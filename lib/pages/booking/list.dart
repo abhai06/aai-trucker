@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 
 import 'package:camera/camera.dart';
 import 'package:connectivity/connectivity.dart';
+import 'package:drive/maps/maps.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_signature_pad/flutter_signature_pad.dart';
 import 'package:image_picker/image_picker.dart';
@@ -74,6 +75,7 @@ class _BookingListPageState extends State<BookingListPage>
     final rows = await dbHelper.getAll('booking',
         whereCondition: 'runsheet_id = ? AND task = ?',
         whereArgs: [widget.item['runsheet_id'], task]);
+    // print(rows);
     status = await dbHelper.getAll('tasks');
     if (mounted) {
       setState(() {
@@ -192,8 +194,8 @@ class _BookingListPageState extends State<BookingListPage>
       'end_date': null,
       'end_remarks': null,
       'formList': 0,
-      'logs': [],
-      'plate_no': 'ABC123',
+      'logs': null,
+      'plate_no': 1,
       'runsheet': widget.item['runsheet_id'],
       'start_remarks': start_remarks.text
     };
@@ -203,15 +205,15 @@ class _BookingListPageState extends State<BookingListPage>
         final responseData = await apiService.post(data, 'monitor');
         if (responseData.statusCode == 200) {
           var monitor = json.decode(responseData.body);
+          print(monitor);
           setState(() {
-            if (monitor['data'].isNotEmpty) {
-              final itm = {
-                'monitor_id': monitor['data']['id'],
-              };
-              dbHelper.update('runsheet', itm, widget.item['runsheet_id']);
-              start = false;
-            }
+            final itm = {
+              'monitor_id': monitor['data']['id'],
+            };
+            dbHelper.update('runsheet', itm, widget.item['runsheet_id']);
           });
+          start = false;
+          Navigator.of(context).pop();
         }
       } catch (error) {
         print(error);
@@ -266,12 +268,13 @@ class _BookingListPageState extends State<BookingListPage>
   Widget build(BuildContext context) {
     TextEditingController searchQueryController = TextEditingController();
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(widget.item['reference'] ?? ''), actions: [
         Builder(builder: (context) {
           return IconButton(
             icon: const Icon(Icons.sync),
             onPressed: () async {
-              booking();
+              await booking();
             },
           );
         })
@@ -418,6 +421,8 @@ class _BookingListPageState extends State<BookingListPage>
                                                 children: [
                                                   Text(
                                                     item['customer'] ?? '',
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                     style: const TextStyle(
                                                       fontSize: 12,
                                                       fontWeight:
@@ -428,6 +433,8 @@ class _BookingListPageState extends State<BookingListPage>
                                                   Text(
                                                     "Status : " +
                                                         (item['status'] ?? ''),
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                     style: const TextStyle(
                                                       fontSize: 12,
                                                       fontWeight:
@@ -475,7 +482,7 @@ class _BookingListPageState extends State<BookingListPage>
                                                             MaterialPageRoute(
                                                                 builder:
                                                                     (context) =>
-                                                                        const MapPage()));
+                                                                        MapScreen()));
                                                       },
                                                       child: const Icon(
                                                         Icons.map,
@@ -726,6 +733,8 @@ class _BookingListPageState extends State<BookingListPage>
                                                 children: [
                                                   Text(
                                                     item['customer'] ?? '',
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                     style: const TextStyle(
                                                       fontSize: 12,
                                                       fontWeight:
@@ -736,6 +745,8 @@ class _BookingListPageState extends State<BookingListPage>
                                                   Text(
                                                     "Status : " +
                                                         (item['status'] ?? ''),
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                     style: const TextStyle(
                                                       fontSize: 12,
                                                       fontWeight:
@@ -783,7 +794,7 @@ class _BookingListPageState extends State<BookingListPage>
                                                             MaterialPageRoute(
                                                                 builder:
                                                                     (context) =>
-                                                                        const MapPage()));
+                                                                        MapScreen()));
                                                       },
                                                       child: const Icon(
                                                         Icons.map,
@@ -1030,7 +1041,7 @@ class _BookingListPageState extends State<BookingListPage>
         // 'signature': signature,
         'attachment': [] //jsonEncode(attachment)
       };
-      final res = await apiService.post(data, 'addTaskLogs', id: monitor_id);
+      final res = await apiService.post(taskLog, 'addTaskLogs', id: monitor_id);
       if (res['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           backgroundColor: Colors.green,
@@ -1216,7 +1227,7 @@ class _BookingListPageState extends State<BookingListPage>
 
   Future<void> updateStatus(data) async {
     DateTime now = DateTime.now();
-    final dateTime = DateFormat('yyyy-MM-dd HH:mm:ss').format(now);
+    final dateTime = DateFormat('yyyy-MM-dd H:mm:ss').format(now);
     List<Map<String, dynamic>> logs = [];
     bool valid = true;
     if (data['task'] == 'DELIVERY') {
@@ -1267,7 +1278,6 @@ class _BookingListPageState extends State<BookingListPage>
         'task_code': data['task_code'] ?? '',
         'contact_person': data['contact_person'] ?? '',
         'datetime': dateTime,
-        // 'formList': 0,
         'task_exception': data['task_exception'] ?? '',
         'line_id': data['line_id'] ?? '',
         'location': data['location'] ?? '',
@@ -1279,9 +1289,8 @@ class _BookingListPageState extends State<BookingListPage>
       };
       setState(() {
         logs.add(task);
+        dbHelper.save('booking_logs', logs);
       });
-
-      await dbHelper.save('booking_logs', logs);
 
       setState(() {
         data['datetime'] = dateTime;
