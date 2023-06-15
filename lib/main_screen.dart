@@ -1,12 +1,10 @@
 import 'package:drive/login.dart';
-import 'package:drive/pages/exception_task.dart';
 import 'package:drive/pages/my_task.dart';
-import 'package:drive/pages/pending_task.dart';
-import 'package:drive/pages/done_task.dart';
 import 'package:flutter/material.dart';
 import 'package:drive/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:drive/pages/runsheet.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
@@ -17,6 +15,8 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   ApiService apiService = ApiService();
+  Runsheet runsheet = Runsheet();
+  MyTaskPage taskPage = const MyTaskPage();
   // DBHelper dbHelper = DBHelper();
   bool isDarkMode = false;
   String mode = 'Light';
@@ -26,9 +26,6 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> _children = [
     const MyTaskPage(),
-    const PendingTaskPage(),
-    const DoneTaskPage(),
-    const ExceptionTaskPage()
   ];
 
   final ThemeData kLightTheme = ThemeData(
@@ -73,17 +70,21 @@ class _MainScreenState extends State<MainScreen> {
     return Theme(
         data: isDarkMode ? kDarkTheme : kLightTheme,
         child: Scaffold(
+          resizeToAvoidBottomInset: false,
           appBar: AppBar(title: Text(currentPageTitle), actions: [
             Builder(builder: (context) {
               if (_currentIndex == 0) {
                 return IconButton(
                   icon: const Icon(Icons.sync),
+                  tooltip: 'Reload',
                   onPressed: () async {
-                    // await runsheet();
-                    // await tasklist();
-                    // await exception();
-                    // final res = await dbHelper.getAll('exception');
-                    // print(res);
+                    final params = {
+                      'page': 1,
+                      'filter': jsonEncode({'plate_no': driver['plate_id']}),
+                      'itemsPerPage': '999',
+                      'device': 'mobile'
+                    };
+                    await runsheet.runsheet(params);
                   },
                 );
               } else {
@@ -111,13 +112,17 @@ class _MainScreenState extends State<MainScreen> {
                             AssetImage('assets/images/profile.png'),
                       ),
                       const SizedBox(height: 5),
+                      // Text(
+                      //   "${driver['trucker']}",
+                      //   style: const TextStyle(color: Colors.white),
+                      // ),
                       Text(
                         "DRIVER : ${driver['name']}",
                         style: const TextStyle(color: Colors.white),
                       ),
-                      const Text(
-                        'PLATE # : 002896',
-                        style: TextStyle(color: Colors.white),
+                      Text(
+                        "PLATE # : ${driver['plate_no']}",
+                        style: const TextStyle(color: Colors.white),
                       ),
                       Text(
                         'DUTY DATE : ${now.month}/${now.day}/${now.year}',
@@ -141,31 +146,6 @@ class _MainScreenState extends State<MainScreen> {
                         context,
                         MaterialPageRoute(
                             builder: (context) => const MyTaskPage()));
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.pending, color: Colors.blue[900]),
-                  title: const Text('In Progress', style: TextStyle()),
-                  onTap: () {
-                    setState(() {
-                      _currentIndex = 1;
-                      currentPageTitle = 'In Progress';
-                    });
-                    Navigator.pop(context);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(
-                    Icons.done,
-                    color: Colors.green,
-                  ),
-                  title: const Text('Done', style: TextStyle()),
-                  onTap: () {
-                    setState(() {
-                      _currentIndex = 2;
-                      currentPageTitle = 'Completed';
-                    });
-                    Navigator.pop(context);
                   },
                 ),
                 ListTile(

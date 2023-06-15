@@ -114,8 +114,8 @@ class _MapPageState extends State<MapPage> {
                     width: 80,
                     height: 80,
                     builder: (context) => Container(
-                            child: Column(
-                          children: const [
+                            child: const Column(
+                          children: [
                             Text(
                               'Pick Up Point',
                               style: TextStyle(
@@ -137,8 +137,8 @@ class _MapPageState extends State<MapPage> {
                   width: 80,
                   height: 80,
                   builder: (context) => Container(
-                      child: Column(
-                    children: const [
+                      child: const Column(
+                    children: [
                       Text(
                         'Delivery Point',
                         style: TextStyle(
