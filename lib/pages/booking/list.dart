@@ -14,12 +14,15 @@ import 'package:lottie/lottie.dart';
 import 'package:multi_image_picker/multi_image_picker.dart';
 
 import 'package:drive/helper/db_helper.dart';
-import 'package:drive/maps/map.dart';
 import 'package:drive/pages/booking/detail.dart';
 import 'package:drive/pages/booking/timeline.dart';
 import 'package:drive/pages/exception.dart';
 import 'package:drive/services/api_service.dart';
 import 'package:phone_call/phone_call.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:drive/main_screen.dart';
+import 'package:drive/connectivity_service.dart';
+import 'package:http/http.dart' as http;
 
 class BookingListPage extends StatefulWidget {
   final item;
@@ -38,8 +41,10 @@ class _BookingListPageState extends State<BookingListPage>
   final scrollController = ScrollController();
   Uint8List? _signatureData;
   DBHelper dbHelper = DBHelper();
+  ConnectivityService connectivity = ConnectivityService();
   ApiService apiService = ApiService();
   List<String> attachment = [];
+  List<Map<String, dynamic>> attach = [];
   late Map<String, dynamic> monitor;
   List<Asset> images = <Asset>[];
   final String _error = 'No Error Dectected';
@@ -58,62 +63,125 @@ class _BookingListPageState extends State<BookingListPage>
   bool start = false;
   int runsheet_id = 0;
   int page = 1;
-  List _items = [];
-  List status = [];
+  List _pickup_items = [];
+  List _delivery_items = [];
   String signature = "";
   TextEditingController start_remarks = TextEditingController();
+  Map<String, dynamic> driver = {};
 
-  Future<List<dynamic>> booking() async {
+  Future<List<dynamic>> pickup_booking() async {
     _isLoading = true;
     bool isTab = _selectedTabIndex == 0;
     var task = "PICKUP";
-    if (isTab) {
-      task = "PICKUP";
-    } else {
-      task = "DELIVERY";
-    }
     final rows = await dbHelper.getAll('booking',
         whereCondition: 'runsheet_id = ? AND task = ?',
         whereArgs: [widget.item['runsheet_id'], task]);
-    // print(rows);
-    status = await dbHelper.getAll('tasks');
     if (mounted) {
       setState(() {
-        _items = rows.map((data) {
-          var stat = {};
-          int sequenceNo = isTab ? 2 : 6;
-          if (data['status'] == null || data['status'] == 'Assigned') {
-            sequenceNo = isTab ? 2 : 6;
+        _pickup_items = rows.map((data) {
+          int sequenceNo = data['sequence_no'] ?? 2;
+          String next_status = '';
+          int task_id;
+          String task_code = '';
+          int next_sequence_no;
+          String status = data['status'] ?? 'Assigned';
+          if (status == 'APA' || status == 'ARRIVE AT PICKUP ADDRESS') {
+            next_status = 'START LOADING';
+            task_id = 5;
+            task_code = 'STL';
+            next_sequence_no = sequenceNo + 1;
+          } else if (status == 'STL' || status == 'START LOADING') {
+            next_status = 'FINISH LOADING';
+            task_id = 6;
+            task_code = 'FIL';
+            next_sequence_no = sequenceNo + 1;
+          } else if (status == 'FIL' || status == 'FINISH LOADING') {
+            next_status = 'TIME DEPARTURE AT PICKUP ADDR';
+            task_id = 7;
+            task_code = 'TDP';
+            next_sequence_no = sequenceNo + 1;
+          } else if (status == 'TDP' ||
+              status == 'TIME DEPARTURE AT PICKUP ADDR') {
+            next_status = 'ARRIVE AT DELIVERY ADDRESS';
+            task_id = 8;
+            task_code = 'ADA';
+            next_sequence_no = sequenceNo + 1;
           } else {
-            var seq = isTab ? 5 : 9;
-            sequenceNo =
-                (data['sequence_no'] != null && data['sequence_no'] < seq)
-                    ? data['sequence_no'] + 1
-                    : seq;
+            next_status = 'ARRIVE AT PICKUP ADDRESS';
+            task_id = 4;
+            task_code = 'APA';
+            next_sequence_no = sequenceNo;
           }
-          stat = status.firstWhere((row) => ((row['sequence_no'] != null &&
-              row['sequence_no'] == sequenceNo &&
-              row['task'] == task)));
-          if (stat.isNotEmpty) {
-            return {
-              ...data,
-              'status': data['status'] ?? 'Assigned',
-              'next_status': (sequenceNo <= 9) ? stat['name'] : 'Completed',
-              'task_id': stat['id'] ?? '',
-              'task_code': stat['code'] ?? '',
-              'next_sequence_no': stat['sequence_no'] ?? sequenceNo,
-              'sequence_no': (data['sequence_no'] != null)
-                  ? data['sequence_no']
-                  : (isTab == true)
-                      ? 2
-                      : 6
-            };
-          }
+          return {
+            ...data,
+            'status': status,
+            'next_status': next_status,
+            'task_id': task_id,
+            'task_code': task_code,
+            'next_sequence_no': next_sequence_no
+          };
         }).toList();
       });
     }
     _isLoading = false;
-    return _items;
+    return _pickup_items;
+  }
+
+  Future<List<dynamic>> delivery_booking() async {
+    _isLoading = true;
+    var task = "DELIVERY";
+    final rows = await dbHelper.getAll('booking',
+        whereCondition: 'runsheet_id = ? AND task = ?',
+        whereArgs: [widget.item['runsheet_id'], task]);
+    if (mounted) {
+      setState(() {
+        _delivery_items = rows.map((data) {
+          int sequenceNo = data['sequence_no'] ?? 6;
+          String next_status = '';
+          int task_id;
+          String task_code = '';
+          int next_sequence_no;
+          String status = data['status'] ?? 'Assigned';
+          if (status == 'ADA' || status == 'ARRIVE AT DELIVERY ADDRESS') {
+            next_status = 'START UNLOADING';
+            task_id = 9;
+            task_code = 'STU';
+            next_sequence_no = sequenceNo + 1;
+          } else if (status == 'STU' || status == 'START UNLOADING') {
+            next_status = 'FINISH UNLOADING';
+            task_id = 10;
+            task_code = 'FIU';
+            next_sequence_no = sequenceNo + 1;
+          } else if (status == 'FIU' || status == 'FINISH UNLOADING') {
+            next_status = 'TIME DEPARTURE AT DELIVERY ADDR';
+            task_id = 11;
+            task_code = 'TDD';
+            next_sequence_no = sequenceNo + 1;
+          } else if (status == 'TDD' ||
+              status == 'TIME DEPARTURE AT DELIVERY ADDR') {
+            next_status = 'APPROVED TIME OUT';
+            task_id = 12;
+            task_code = 'ATO';
+            next_sequence_no = sequenceNo + 1;
+          } else {
+            next_status = 'ARRIVE AT DELIVERY ADDRESS';
+            task_id = 8;
+            task_code = 'ADA';
+            next_sequence_no = sequenceNo;
+          }
+          return {
+            ...data,
+            'status': status,
+            'next_status': next_status,
+            'task_id': task_id,
+            'task_code': task_code,
+            'next_sequence_no': next_sequence_no,
+          };
+        }).toList();
+      });
+    }
+    _isLoading = false;
+    return _delivery_items;
   }
 
   Future<bool> checkInternetConnection() async {
@@ -127,8 +195,10 @@ class _BookingListPageState extends State<BookingListPage>
   }
 
   Future<void> _getRecordById(int id) async {
-    bool online = await checkInternetConnection();
-    if (online) {
+    bool _isConnected = await connectivity.isConnected();
+    if (!_isConnected) {
+      ConnectivityService.noInternetDialog(context);
+    } else {
       if (widget.item['monitor_id'] == null) {
         final responseData = await apiService.getRecordById("monitor", id);
         if (responseData.statusCode == 200) {
@@ -145,7 +215,8 @@ class _BookingListPageState extends State<BookingListPage>
               start = true;
               showDialog(
                 context: context,
-                builder: (BuildContext context) {
+                barrierDismissible: false,
+                builder: (BuildContext dialogContext) {
                   return AlertDialog(
                     title: const Text('Start Runsheet'),
                     content: TextField(
@@ -162,13 +233,19 @@ class _BookingListPageState extends State<BookingListPage>
                           style: TextStyle(color: Colors.red),
                         ),
                         onPressed: () {
-                          Navigator.of(context).pop();
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const MainScreen()),
+                            (Route<dynamic> route) => false,
+                          );
                         },
                       ),
                       TextButton(
                         child: const Text('START'),
                         onPressed: () {
                           startRunsheet();
+                          Navigator.of(context).pop();
                         },
                       ),
                     ],
@@ -195,25 +272,47 @@ class _BookingListPageState extends State<BookingListPage>
       'end_remarks': null,
       'formList': 0,
       'logs': null,
-      'plate_no': 1,
+      'plate_no': widget.item['plate_id'],
       'runsheet': widget.item['runsheet_id'],
-      'start_remarks': start_remarks.text
+      'start_remarks': start_remarks.text,
+      'approved_time_in': '',
+      'approved_time_out': ''
     };
-    bool online = await checkInternetConnection();
-    if (online) {
+    bool _isConnected = await connectivity.isConnected();
+    if (!_isConnected) {
+      ConnectivityService.noInternetDialog(context);
+    } else {
       try {
         final responseData = await apiService.post(data, 'monitor');
-        if (responseData.statusCode == 200) {
-          var monitor = json.decode(responseData.body);
-          print(monitor);
+        if (responseData['success'] == true) {
+          var monitor = responseData['data'];
           setState(() {
-            final itm = {
-              'monitor_id': monitor['data']['id'],
-            };
-            dbHelper.update('runsheet', itm, widget.item['runsheet_id']);
+            monitor_id = monitor['id'];
           });
-          start = false;
-          Navigator.of(context).pop();
+          final itm = {
+            'monitor_id': monitor_id,
+          };
+          await dbHelper
+              .update('runsheet', itm, widget.item['runsheet_id'])
+              .then((_) {
+            start = false;
+            Navigator.of(context).pop();
+            setState(() {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                backgroundColor: Colors.green,
+                content: Text('Runsheet Started Successfully'),
+                behavior: SnackBarBehavior.floating,
+              ));
+            });
+          });
+        } else {
+          setState(() {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              backgroundColor: Colors.red,
+              content: Text('Runsheet unable to start'),
+              behavior: SnackBarBehavior.floating,
+            ));
+          });
         }
       } catch (error) {
         print(error);
@@ -221,21 +320,29 @@ class _BookingListPageState extends State<BookingListPage>
     }
   }
 
-  Future<void> _openCamera() async {
+  Future<void> _openCamera(data) async {
     final XFile? image = await _picker.pickImage(source: ImageSource.camera);
     final bytes = await image!.readAsBytes();
-    final base64String = base64Encode(bytes);
+    final base64Image = base64Encode(bytes);
+    final files = {
+      'source_id': data['source_id'] ?? '',
+      'task_id': data['task_id'] ?? '',
+      'attach': base64Image
+    };
     setState(() {
-      attachment.add(base64String);
+      attach.add(files);
+      attachment.add(base64Image);
     });
   }
 
   void _simulateLoading() async {
-    await Future.delayed(
-        const Duration(seconds: 2)); // Simulate loading with a delay
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    final userdata = prefs.getString('user');
+    if (userdata != "") {
+      driver = json.decode(userdata!);
+    }
     setState(() {
       _getRecordById(widget.item['runsheet_id']);
-      _isLoading = false;
     });
   }
 
@@ -260,50 +367,36 @@ class _BookingListPageState extends State<BookingListPage>
   void initState() {
     super.initState();
     _simulateLoading();
+    _getRecordById(widget.item['runsheet_id']);
     _tabController = TabController(length: 2, vsync: this);
     _tabController!.addListener(_handleTabSelection);
+    pickup_booking();
+    delivery_booking();
   }
 
   @override
   Widget build(BuildContext context) {
-    TextEditingController searchQueryController = TextEditingController();
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(widget.item['reference'] ?? ''), actions: [
         Builder(builder: (context) {
           return IconButton(
-            icon: const Icon(Icons.sync),
-            onPressed: () async {
-              await booking();
-            },
-          );
+              icon: const Icon(Icons.sync), onPressed: pickup_booking);
         })
       ]),
-      body: _isLoading
-          ? Center(
-              child: Lottie.asset(
-                "assets/animations/loading.json",
-                animate: true,
-                alignment: Alignment.center,
-                height: 100,
-                width: 100,
-              ),
-            )
-          : Column(children: [
-              Expanded(
-                  child: TabBarView(
-                controller: _tabController,
-                children: [_buildPickupTab(), _buildDeliveryTab()],
-              ))
-            ]),
+      body: TabBarView(
+        controller: _tabController,
+        children: [_buildPickupTab(), _buildDeliveryTab()],
+      ),
       bottomNavigationBar: BottomAppBar(
         color: Colors.grey.shade900,
         child: TabBar(
           onTap: (int) {
-            _isLoading = true;
-            setState(() {
-              booking();
-            });
+            if (int == 0) {
+              pickup_booking();
+            } else {
+              delivery_booking();
+            }
           },
           indicator: BoxDecoration(
             color: Colors.red.shade900,
@@ -319,58 +412,13 @@ class _BookingListPageState extends State<BookingListPage>
           ],
         ),
       ),
-      floatingActionButton: Visibility(
-          visible: start,
-          child: FloatingActionButton(
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (BuildContext context) {
-                  return AlertDialog(
-                    title: const Text('Start Runsheet'),
-                    content: TextField(
-                      keyboardType: TextInputType.text,
-                      controller: start_remarks,
-                      decoration: const InputDecoration(
-                        labelText: 'Remarks',
-                      ),
-                    ),
-                    actions: [
-                      TextButton(
-                        child: const Text(
-                          'CANCEL',
-                          style: TextStyle(color: Colors.red),
-                        ),
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                        },
-                      ),
-                      TextButton(
-                        child: const Text('START'),
-                        onPressed: () {
-                          startRunsheet();
-                        },
-                      ),
-                    ],
-                  );
-                },
-              );
-            },
-            backgroundColor: Colors.black,
-            child: const Text(
-              'START',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          )),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 
   Widget _buildPickupTab() {
-    return FutureBuilder<List<dynamic>>(
-        future: booking(),
-        builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
+    return FutureBuilder(
+        future: pickup_booking(),
+        builder: (context, AsyncSnapshot snapshot) {
           if (snapshot.hasData) {
             return ListView.builder(
                 padding: const EdgeInsets.all(4),
@@ -378,10 +426,14 @@ class _BookingListPageState extends State<BookingListPage>
                 controller: scrollController,
                 itemBuilder: (context, int index) {
                   final item = snapshot.data![index];
-                  DateTime dateTime =
-                      DateTime.parse(widget.item['updated_at'] ?? '');
-                  final formattedDateTime =
-                      DateFormat('MMM d,yyyy h:mm a').format(dateTime);
+                  DateTime est_pick =
+                      DateTime.parse(item['pickup_expected_date'] ?? '');
+                  final pickup_dtime =
+                      DateFormat('MMM d,yyyy h:mm a').format(est_pick);
+                  DateTime est_dlv =
+                      DateTime.parse(item['delivery_expected_date'] ?? '');
+                  final deliver_time =
+                      DateFormat('MMM d,yyyy h:mm a').format(est_dlv);
                   return Padding(
                       padding: const EdgeInsets.all(4),
                       child: AbsorbPointer(
@@ -391,8 +443,8 @@ class _BookingListPageState extends State<BookingListPage>
                             Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                    builder: (context) => BookingDetailPage(
-                                        snapshot.data![index])));
+                                    builder: (context) =>
+                                        BookingDetailPage(item)));
                           },
                           child: Card(
                             shadowColor: Colors.black,
@@ -408,8 +460,9 @@ class _BookingListPageState extends State<BookingListPage>
                                           ListTile(
                                               title: Text(
                                                 item['reference'] ?? '',
-                                                style: const TextStyle(
-                                                    fontSize: 13,
+                                                style: TextStyle(
+                                                    color: Colors.red.shade900,
+                                                    fontSize: 16,
                                                     fontWeight:
                                                         FontWeight.bold),
                                               ),
@@ -453,8 +506,9 @@ class _BookingListPageState extends State<BookingListPage>
                                                             context,
                                                             MaterialPageRoute(
                                                                 builder: (context) =>
-                                                                    Timeline(_items[
-                                                                        index])));
+                                                                    Timeline(
+                                                                        _pickup_items[
+                                                                            index])));
                                                       },
                                                       child: const Icon(
                                                         Icons.timeline,
@@ -482,7 +536,7 @@ class _BookingListPageState extends State<BookingListPage>
                                                             MaterialPageRoute(
                                                                 builder:
                                                                     (context) =>
-                                                                        MapScreen()));
+                                                                        const MapScreen()));
                                                       },
                                                       child: const Icon(
                                                         Icons.map,
@@ -490,7 +544,6 @@ class _BookingListPageState extends State<BookingListPage>
                                                       )),
                                                 ],
                                               )),
-                                          const Divider(),
                                           ListTile(
                                               leading: const Icon(
                                                 Icons.place,
@@ -529,15 +582,27 @@ class _BookingListPageState extends State<BookingListPage>
                                                       CrossAxisAlignment.start,
                                                   children: [
                                                     Text(
-                                                      item['pickup_contact_person'] ??
-                                                          '',
+                                                      pickup_dtime,
                                                       style: const TextStyle(
                                                           fontSize: 12,
                                                           fontWeight:
-                                                              FontWeight.bold),
+                                                              FontWeight.bold,
+                                                          color: Colors.red,
+                                                          overflow: TextOverflow
+                                                              .ellipsis),
                                                     ),
                                                     Text(
                                                       item['pickup_loc'] ?? '',
+                                                      style: const TextStyle(
+                                                          fontSize: 12,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          overflow: TextOverflow
+                                                              .ellipsis),
+                                                    ),
+                                                    Text(
+                                                      item['pickup_other_address'] ??
+                                                          '',
                                                       style: const TextStyle(
                                                           fontSize: 11,
                                                           overflow: TextOverflow
@@ -561,40 +626,57 @@ class _BookingListPageState extends State<BookingListPage>
                                                       CrossAxisAlignment.start,
                                                   children: [
                                                     Text(
-                                                      item['delivery_contact_person'] ??
+                                                      deliver_time,
+                                                      style: const TextStyle(
+                                                          fontSize: 12,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          color: Colors.red,
+                                                          overflow: TextOverflow
+                                                              .ellipsis),
+                                                    ),
+                                                    Text(
+                                                      item['delivery_loc'] ??
                                                           '',
                                                       style: const TextStyle(
                                                           fontSize: 12,
                                                           fontWeight:
-                                                              FontWeight.bold),
+                                                              FontWeight.bold,
+                                                          overflow: TextOverflow
+                                                              .ellipsis),
                                                     ),
                                                     Text(
-                                                        item['delivery_loc'] ??
-                                                            '',
-                                                        style: const TextStyle(
-                                                            fontSize: 11)),
+                                                      item['delivery_other_address'] ??
+                                                          '',
+                                                      style: const TextStyle(
+                                                          fontSize: 11,
+                                                          overflow: TextOverflow
+                                                              .ellipsis),
+                                                    ),
                                                   ])),
                                           ListTile(
-                                              leading: ElevatedButton(
-                                                style: ElevatedButton.styleFrom(
-                                                    backgroundColor:
-                                                        Colors.red.shade700,
-                                                    shape:
-                                                        RoundedRectangleBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              20),
-                                                    )),
-                                                onPressed: () {
-                                                  setState(() {
-                                                    _makePhoneCall(
-                                                        '09353330652');
-                                                  });
-                                                },
-                                                child: const Icon(Icons.call,
-                                                    color: Colors.white),
-                                              ),
-                                              title: item['sequence_no'] == 5
+                                              // leading: ElevatedButton(
+                                              //   style: ElevatedButton.styleFrom(
+                                              //       backgroundColor:
+                                              //           Colors.red.shade700,
+                                              //       shape:
+                                              //           RoundedRectangleBorder(
+                                              //         borderRadius:
+                                              //             BorderRadius.circular(
+                                              //                 20),
+                                              //       )),
+                                              //   onPressed: () {
+                                              //     setState(() {
+                                              //       _makePhoneCall(
+                                              //           '09353330652');
+                                              //     });
+                                              //   },
+                                              //   child: const Icon(Icons.call,
+                                              //       color: Colors.white),
+                                              // ),
+                                              title: (item['status'] == 'TDP' ||
+                                                      item['status'] ==
+                                                          'TIME DEPARTURE AT PICKUP ADDR')
                                                   ? Container(
                                                       margin:
                                                           const EdgeInsets.only(
@@ -680,7 +762,7 @@ class _BookingListPageState extends State<BookingListPage>
 
   Widget _buildDeliveryTab() {
     return FutureBuilder<List<dynamic>>(
-        future: booking(),
+        future: delivery_booking(),
         builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
           if (snapshot.hasData) {
             return ListView.builder(
@@ -689,10 +771,14 @@ class _BookingListPageState extends State<BookingListPage>
                 controller: scrollController,
                 itemBuilder: (context, int index) {
                   final item = snapshot.data![index];
-                  DateTime dateTime =
-                      DateTime.parse(widget.item['updated_at'] ?? '');
-                  final formattedDateTime =
-                      DateFormat('MMM d,yyyy h:mm a').format(dateTime);
+                  DateTime est_pick =
+                      DateTime.parse(item['pickup_expected_date'] ?? '');
+                  final pickup_dtime =
+                      DateFormat('MMM d,yyyy h:mm a').format(est_pick);
+                  DateTime est_dlv =
+                      DateTime.parse(item['delivery_expected_date'] ?? '');
+                  final deliver_time =
+                      DateFormat('MMM d,yyyy h:mm a').format(est_dlv);
                   return Padding(
                       padding: const EdgeInsets.all(4),
                       child: AbsorbPointer(
@@ -720,8 +806,9 @@ class _BookingListPageState extends State<BookingListPage>
                                           ListTile(
                                               title: Text(
                                                 item['reference'] ?? '',
-                                                style: const TextStyle(
-                                                    fontSize: 13,
+                                                style: TextStyle(
+                                                    color: Colors.red.shade900,
+                                                    fontSize: 16,
                                                     fontWeight:
                                                         FontWeight.bold),
                                               ),
@@ -765,8 +852,9 @@ class _BookingListPageState extends State<BookingListPage>
                                                             context,
                                                             MaterialPageRoute(
                                                                 builder: (context) =>
-                                                                    Timeline(_items[
-                                                                        index])));
+                                                                    Timeline(
+                                                                        _delivery_items[
+                                                                            index])));
                                                       },
                                                       child: const Icon(
                                                         Icons.timeline,
@@ -794,7 +882,7 @@ class _BookingListPageState extends State<BookingListPage>
                                                             MaterialPageRoute(
                                                                 builder:
                                                                     (context) =>
-                                                                        MapScreen()));
+                                                                        const MapScreen()));
                                                       },
                                                       child: const Icon(
                                                         Icons.map,
@@ -841,15 +929,27 @@ class _BookingListPageState extends State<BookingListPage>
                                                       CrossAxisAlignment.start,
                                                   children: [
                                                     Text(
-                                                      item['pickup_contact_person'] ??
-                                                          '',
+                                                      pickup_dtime,
                                                       style: const TextStyle(
                                                           fontSize: 12,
                                                           fontWeight:
-                                                              FontWeight.bold),
+                                                              FontWeight.bold,
+                                                          color: Colors.red,
+                                                          overflow: TextOverflow
+                                                              .ellipsis),
                                                     ),
                                                     Text(
                                                       item['pickup_loc'] ?? '',
+                                                      style: const TextStyle(
+                                                          fontSize: 12,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          overflow: TextOverflow
+                                                              .ellipsis),
+                                                    ),
+                                                    Text(
+                                                      item['pickup_other_address'] ??
+                                                          '',
                                                       style: const TextStyle(
                                                           fontSize: 11,
                                                           overflow: TextOverflow
@@ -873,37 +973,54 @@ class _BookingListPageState extends State<BookingListPage>
                                                       CrossAxisAlignment.start,
                                                   children: [
                                                     Text(
-                                                      item['delivery_contact_person'] ??
+                                                      deliver_time,
+                                                      style: const TextStyle(
+                                                          fontSize: 12,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          color: Colors.red,
+                                                          overflow: TextOverflow
+                                                              .ellipsis),
+                                                    ),
+                                                    Text(
+                                                      item['delivery_loc'] ??
                                                           '',
                                                       style: const TextStyle(
                                                           fontSize: 12,
                                                           fontWeight:
-                                                              FontWeight.bold),
+                                                              FontWeight.bold,
+                                                          overflow: TextOverflow
+                                                              .ellipsis),
                                                     ),
                                                     Text(
-                                                        item['delivery_loc'] ??
-                                                            '',
-                                                        style: const TextStyle(
-                                                            fontSize: 11)),
+                                                      item['delivery_other_address'] ??
+                                                          '',
+                                                      style: const TextStyle(
+                                                          fontSize: 11,
+                                                          overflow: TextOverflow
+                                                              .ellipsis),
+                                                    ),
                                                   ])),
                                           ListTile(
-                                              leading: ElevatedButton(
-                                                style: ElevatedButton.styleFrom(
-                                                    backgroundColor:
-                                                        Colors.red.shade700,
-                                                    shape:
-                                                        RoundedRectangleBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              20),
-                                                    )),
-                                                onPressed: () {
-                                                  _makePhoneCall('09353330652');
-                                                },
-                                                child: const Icon(Icons.call,
-                                                    color: Colors.white),
-                                              ),
-                                              title: item['sequence_no'] == 9
+                                              // leading: ElevatedButton(
+                                              //   style: ElevatedButton.styleFrom(
+                                              //       backgroundColor:
+                                              //           Colors.red.shade700,
+                                              //       shape:
+                                              //           RoundedRectangleBorder(
+                                              //         borderRadius:
+                                              //             BorderRadius.circular(
+                                              //                 20),
+                                              //       )),
+                                              //   onPressed: () {
+                                              //     _makePhoneCall('09353330652');
+                                              //   },
+                                              //   child: const Icon(Icons.call,
+                                              //       color: Colors.white),
+                                              // ),
+                                              title: (item['status'] == 'TDD' ||
+                                                      item['status'] ==
+                                                          'TIME DEPARTURE AT DELIVERY ADDR')
                                                   ? Container(
                                                       margin:
                                                           const EdgeInsets.only(
@@ -962,9 +1079,40 @@ class _BookingListPageState extends State<BookingListPage>
                                                               //     Icons.east),
                                                             ]),
                                                       ),
-                                                      onPressed: () {
-                                                        _showDialog(
-                                                            context, item);
+                                                      onPressed: () async {
+                                                        final rows =
+                                                            await dbHelper.getAll(
+                                                                'booking',
+                                                                whereCondition:
+                                                                    'source_id = ? AND task = ? AND reference = ?',
+                                                                whereArgs: [
+                                                                  item[
+                                                                      'source_id'],
+                                                                  'PICKUP',
+                                                                  item[
+                                                                      'reference']
+                                                                ],
+                                                                orderBy:
+                                                                    'sequence_no DESC');
+
+                                                        setState(() {
+                                                          if (rows.isNotEmpty) {
+                                                            final stat = rows[0]
+                                                                ['status'];
+                                                            if (stat != 'TDP') {
+                                                              errorDialog(
+                                                                  context,
+                                                                  item);
+                                                            } else {
+                                                              _showDialog(
+                                                                  context,
+                                                                  item);
+                                                            }
+                                                          } else {
+                                                            _showDialog(
+                                                                context, item);
+                                                          }
+                                                        });
                                                       })),
                                         ]))
                               ],
@@ -987,7 +1135,7 @@ class _BookingListPageState extends State<BookingListPage>
         });
   }
 
-  Future<List> loadAssets() async {
+  Future<List> loadAssets(data) async {
     List<Asset> resultList = <Asset>[];
     String error = 'No Error Detected';
 
@@ -1017,52 +1165,24 @@ class _BookingListPageState extends State<BookingListPage>
       ByteData byteData = await images[i].getByteData();
       List<int> imageData = byteData.buffer.asUint8List();
       String base64Image = base64Encode(imageData);
-      attachment.add(base64Image);
+      final attachs = {
+        'source_id': data['source_id'] ?? '',
+        'task_id': data['task_id'] ?? '',
+        'attach': base64Image
+      };
+      setState(() {
+        attach.add(attachs);
+        attachment.add(base64Image);
+      });
     }
     return images;
   }
 
-  Future<void> pushData(data) async {
-    bool online = await checkInternetConnection();
-    if (online) {
-      var taskLog = {
-        'task': data['next_status'] ?? '',
-        'task_code': data['task_code'] ?? '',
-        'contact_person': data['contact_person'] ?? 'nilo besingga',
-        'datetime': data['datetime'],
-        'formList': 0,
-        'task_exception': data['task_exception'] ?? '',
-        'line_id': data['line_id'] ?? 1,
-        'location': data['location'] ?? 1,
-        'source_id': data['source_id'] ?? '',
-        'task_id': data['task_id'] ?? '',
-        'note': data['note'] ?? '',
-        'task_type': data['task'] ?? '',
-        // 'signature': signature,
-        'attachment': [] //jsonEncode(attachment)
-      };
-      final res = await apiService.post(taskLog, 'addTaskLogs', id: monitor_id);
-      if (res['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          backgroundColor: Colors.green,
-          content: Text('Status Successfully Sync to server.'),
-          behavior: SnackBarBehavior.floating,
-        ));
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          backgroundColor: Colors.red,
-          content: Column(children: [
-            Text(res['message']),
-            Text(json.encode(res['data'])),
-          ]),
-          behavior: SnackBarBehavior.floating,
-        ));
-      }
-    }
-  }
-
   Future<void> _showDialog(BuildContext context, data) async {
     final TextEditingController note = TextEditingController();
+    final TextEditingController receive_by = TextEditingController();
+    String? _errorMessage;
+    attachment = [];
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -1074,132 +1194,159 @@ class _BookingListPageState extends State<BookingListPage>
             children: <Widget>[
               const SizedBox(height: 8.0),
               Container(
-                child: Text(
-                  "${"Please confirm status change to \n" + (data['next_status'] ?? '')}.",
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(height: 8.0),
-              const Text('Add Signature', textAlign: TextAlign.start),
-              const SizedBox(height: 8.0),
-              Container(
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: Colors.grey,
-                    width: 1.0,
-                  ),
-                ),
-                height: 100.0,
-                child: Signature(
-                  key: _signatureKey,
-                  color: Colors.black,
-                  strokeWidth: 2.0,
-                ),
-              ),
-              const SizedBox(height: 8.0),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  child: Column(
                 children: [
-                  FilledButton(
-                      style: ButtonStyle(
-                        backgroundColor:
-                            MaterialStateProperty.all<Color>(Colors.yellow),
-                      ),
-                      child: const Text(
-                        'Clear Signature',
-                        style: TextStyle(color: Colors.black),
-                      ),
-                      onPressed: () {
-                        _signatureKey.currentState!.clear();
-                      }),
+                  Text(data['reference'] ?? '',
+                      style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16)),
+                  Text(
+                    "${"Please confirm status change to \n" + (data['next_status'] ?? '')}.",
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ],
-              ),
-              const SizedBox(height: 8.0),
-              const Text('Add Attachment:', textAlign: TextAlign.start),
-              const SizedBox(height: 8.0),
-              Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-                TextButton.icon(
-                    icon: const Icon(Icons.attach_file, color: Colors.grey),
-                    label: const Text('Attach',
-                        style: TextStyle(color: Colors.black)),
-                    onPressed: loadAssets),
-                TextButton.icon(
-                  onPressed: _openCamera,
-                  icon: const Icon(Icons.camera_alt, color: Colors.grey),
-                  label: const Text('Camera',
-                      style: TextStyle(color: Colors.black)),
-                ),
-              ]),
-              const SizedBox(height: 8.0),
-              attachment.isNotEmpty
-                  ? Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: Colors.grey,
-                          width: 1.0,
-                        ),
-                      ),
-                      height: 100,
-                      child: GridView.builder(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          mainAxisSpacing: 8,
-                          crossAxisSpacing: 8,
-                          childAspectRatio: 1,
-                        ),
-                        itemCount: attachment.length,
-                        itemBuilder: (context, index) {
-                          return Stack(
+              )),
+              (data['task'] == 'DELIVERY' && data['task_code'] == 'FIU')
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                          const SizedBox(height: 8.0),
+                          const Text('Add Signature',
+                              textAlign: TextAlign.start),
+                          const SizedBox(height: 8.0),
+                          Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: Colors.grey,
+                                width: 1.0,
+                              ),
+                            ),
+                            height: 100.0,
+                            child: Signature(
+                              key: _signatureKey,
+                              color: Colors.black,
+                              strokeWidth: 2.0,
+                            ),
+                          ),
+                          const SizedBox(height: 8.0),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
-                              Image.memory(
-                                base64Decode(attachment[index]),
-                                width: 300,
-                                height: 300,
-                                alignment: Alignment.center,
-                              ),
-                              Positioned(
-                                top: 0,
-                                right: 0,
-                                child: Checkbox(
-                                  value: true, // Check the box automatically
-                                  onChanged: (bool? value) {
-                                    setState(() {
-                                      if (value == false) {
-                                        attachment.removeAt(index);
-                                      }
-                                    });
-                                  },
-                                ),
-                              ),
+                              TextButton(
+                                  child: const Text(
+                                    'Clear Signature',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                  onPressed: () {
+                                    _signatureKey.currentState!.clear();
+                                  }),
                             ],
-                          );
-                        },
-                      ),
-                    )
-                  : const Text(''),
-              const SizedBox(height: 8.0),
-              const Text('Remarks:', textAlign: TextAlign.start),
-              const SizedBox(height: 8.0),
+                          ),
+                          // const SizedBox(height: 8.0),
+                          // const Text('Add Attachment:',
+                          //     textAlign: TextAlign.start),
+                          // const SizedBox(height: 8.0),
+                          // Row(
+                          //     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          //     children: [
+                          //       TextButton.icon(
+                          //           icon: const Icon(Icons.attach_file,
+                          //               color: Colors.grey),
+                          //           label: const Text('Attach',
+                          //               style: TextStyle(color: Colors.black)),
+                          //           onPressed: () {
+                          //             loadAssets(data);
+                          //           }),
+                          //       TextButton.icon(
+                          //         onPressed: () {
+                          //           _openCamera(data);
+                          //         },
+                          //         icon: const Icon(Icons.camera_alt,
+                          //             color: Colors.grey),
+                          //         label: const Text('Camera',
+                          //             style: TextStyle(color: Colors.black)),
+                          //       ),
+                          //     ]),
+                          // const SizedBox(height: 8.0),
+                          // attachment.isNotEmpty
+                          //     ? Container(
+                          //         decoration: BoxDecoration(
+                          //           border: Border.all(
+                          //             color: Colors.grey,
+                          //             width: 1.0,
+                          //           ),
+                          //         ),
+                          //         height: 100,
+                          //         child: GridView.builder(
+                          //           gridDelegate:
+                          //               const SliverGridDelegateWithFixedCrossAxisCount(
+                          //             crossAxisCount: 3,
+                          //             mainAxisSpacing: 8,
+                          //             crossAxisSpacing: 8,
+                          //             childAspectRatio: 1,
+                          //           ),
+                          //           itemCount: attachment.length,
+                          //           itemBuilder: (context, index) {
+                          //             return Stack(
+                          //               children: [
+                          //                 Image.memory(
+                          //                   base64Decode(attachment[index]),
+                          //                   width: 300,
+                          //                   height: 300,
+                          //                   alignment: Alignment.center,
+                          //                 ),
+                          //                 Positioned(
+                          //                   top: 0,
+                          //                   right: 0,
+                          //                   child: Checkbox(
+                          //                     value:
+                          //                         true, // Check the box automatically
+                          //                     onChanged: (bool? value) {
+                          //                       setState(() {
+                          //                         if (value == false) {
+                          //                           attachment.removeAt(index);
+                          //                         }
+                          //                       });
+                          //                     },
+                          //                   ),
+                          //                 ),
+                          //               ],
+                          //             );
+                          //           },
+                          //         ),
+                          //       )
+                          //     : const Text(''),
+                          const SizedBox(height: 8.0),
+                          SizedBox(
+                              height: 40.0,
+                              child: TextField(
+                                controller: receive_by,
+                                keyboardType: TextInputType.text,
+                                decoration: InputDecoration(
+                                    border: OutlineInputBorder(),
+                                    labelText: 'Received By',
+                                    errorText: _errorMessage),
+                              )),
+                        ])
+                  : Container(),
+              const SizedBox(height: 16.0),
               TextField(
                 controller: note,
                 decoration: const InputDecoration(
-                    border: OutlineInputBorder(), hintText: 'Enter Remarks'),
+                    labelText: 'Remarks', border: OutlineInputBorder()),
               ),
               const SizedBox(height: 16.0),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  FilledButton(
-                      style: ButtonStyle(
-                        backgroundColor:
-                            MaterialStateProperty.all<Color>(Colors.red),
-                      ),
-                      child: const Text('CANCEL'),
+                  TextButton(
+                      child: const Text('CANCEL',
+                          style: TextStyle(color: Colors.red)),
                       onPressed: () {
                         setState(() {
-                          Navigator.pop(context);
+                          Navigator.of(context).pop();
                         });
                       }),
                   const SizedBox(
@@ -1210,10 +1357,12 @@ class _BookingListPageState extends State<BookingListPage>
                       backgroundColor:
                           MaterialStateProperty.all<Color>(Colors.green),
                     ),
-                    child: const Text('MARK STATUS'),
-                    onPressed: () async {
+                    child:
+                        const Text('SUBMIT', overflow: TextOverflow.ellipsis),
+                    onPressed: () {
                       data['note'] = note.text;
-                      await updateStatus(data);
+                      data['receive_by'] = receive_by.text;
+                      updateStatus(data);
                     },
                   ),
                 ],
@@ -1225,108 +1374,86 @@ class _BookingListPageState extends State<BookingListPage>
     );
   }
 
+  Future<void> errorDialog(BuildContext context, data) {
+    return showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Warning!', style: TextStyle(color: Colors.red)),
+          content: Text(
+              "Booking ${data['reference'] ?? ''} is not yet PICK-UP, Unable to change status."),
+          actions: [
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> updateStatus(data) async {
     DateTime now = DateTime.now();
     final dateTime = DateFormat('yyyy-MM-dd H:mm:ss').format(now);
     List<Map<String, dynamic>> logs = [];
-    bool valid = true;
-    if (data['task'] == 'DELIVERY') {
-      final rows = await dbHelper.getAll('booking',
-          whereCondition: 'source_id = ? AND task = ? AND reference = ?',
-          whereArgs: [data['source_id'], 'PICKUP', data['reference']]);
-      if (rows.isNotEmpty &&
-          rows[0]['status'] != 'TIME DEPARTURE AT PICKUP ADDR') {
-        setState(() {
-          valid = false;
-          showDialog(
-            context: context,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                title:
-                    const Text('Warning!', style: TextStyle(color: Colors.red)),
-                content: Text(
-                    "Booking ${data['reference']} is not yet PICK-UP, Unable to change status."),
-                actions: [
-                  TextButton(
-                    child: const Text('OK'),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                  ),
-                ],
-              );
-            },
-          );
-        });
-      } else {
-        valid = true;
-      }
-    }
 
-    if (valid) {
-      final sign = _signatureKey.currentState;
-      final image = await sign?.getData();
-      var bytes = await image!.toByteData(format: ui.ImageByteFormat.png);
+    final sign = _signatureKey.currentState;
+    if (sign != null) {
+      final image = await sign.getData();
+      var bytes = await image.toByteData(format: ui.ImageByteFormat.png);
       final signature = base64.encode(bytes!.buffer.asUint8List());
-      final book = {
-        'status': data['next_status'] ?? '',
-        'sequence_no': data['next_sequence_no'] ?? ''
-      };
-      await dbHelper.update('booking', book, data['id']);
-      final task = {
-        'task': data['next_status'] ?? '',
-        'task_code': data['task_code'] ?? '',
-        'contact_person': data['contact_person'] ?? '',
-        'datetime': dateTime,
-        'task_exception': data['task_exception'] ?? '',
-        'line_id': data['line_id'] ?? '',
-        'location': data['location'] ?? '',
-        'source_id': data['source_id'] ?? '',
-        'task_id': data['task_id'] ?? '',
-        'note': data['note'] ?? '',
-        'attachment': jsonEncode(attachment),
-        'signature': signature
-      };
+      String mimeType = 'application/png';
+      var signed = 'data:$mimeType;base64,$signature';
       setState(() {
-        logs.add(task);
-        dbHelper.save('booking_logs', logs);
-      });
-
-      setState(() {
-        data['datetime'] = dateTime;
-        pushData(data);
-      });
-
-      setState(() {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          backgroundColor: Colors.green,
-          content: Text('Status Successfully Updated.'),
-          behavior: SnackBarBehavior.floating,
-        ));
-      });
-      setState(() {
-        Navigator.of(context).pop();
+        final files = {
+          'source_id': data['source_id'] ?? '',
+          'task_id': data['task_id'] ?? '',
+          'attach': signed
+        };
+        attach.add(files);
       });
     }
-  }
-
-  errorAlertDialog() {
-    context:
-    context;
-    builder:
-    (BuildContext context) {
-      return AlertDialog(
-        title: const Text('Alert'),
-        content: const Text('This is an alert dialog.'),
-        actions: [
-          TextButton(
-            child: const Text('OK'),
-            onPressed: () {
-              Navigator.of(context).pop(); // Close the dialog
-            },
-          ),
-        ],
-      );
+    final book = {
+      'status': data['task_code'] ?? '',
+      'sequence_no': data['next_sequence_no'] ?? ''
     };
+    dbHelper.update('booking', book, data['id']);
+    final task = {
+      'task': data['next_status'] ?? '',
+      'task_type': data['task'] ?? '',
+      'task_code': data['task_code'] ?? '',
+      'contact_person': data['receive_by'] ?? '',
+      'datetime': dateTime,
+      'task_exception': data['task_exception'] ?? '',
+      'line_id': data['line_id'] ?? '',
+      'location': data['location'] ?? '',
+      'source_id': data['source_id'] ?? '',
+      'task_id': data['task_id'] ?? '',
+      'note': data['note'] ?? '',
+      // 'attachment': jsonEncode(attachment),
+      // 'signature': signature,
+      'monitor_id': monitor_id,
+      'flag': 0
+    };
+    setState(() {
+      logs.add(task);
+      dbHelper.save('booking_logs', logs);
+      if (attach.isNotEmpty) {
+        dbHelper.save('attachment', attach);
+      }
+    });
+    setState(() {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        backgroundColor: Colors.green,
+        content: Text('Status Successfully Updated.'),
+        behavior: SnackBarBehavior.floating,
+      ));
+    });
+    setState(() {
+      Navigator.of(context).pop();
+    });
   }
 }

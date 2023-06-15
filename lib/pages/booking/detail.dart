@@ -1,5 +1,7 @@
 import 'package:drive/maps/map.dart';
 import 'package:flutter/material.dart';
+import 'package:drive/connectivity_service.dart';
+import 'package:intl/intl.dart';
 
 class BookingDetailPage extends StatefulWidget {
   final item;
@@ -9,37 +11,57 @@ class BookingDetailPage extends StatefulWidget {
 }
 
 class _BookingDetailState extends State<BookingDetailPage> {
+  ConnectivityService connectivity = ConnectivityService();
+
   @override
   void initState() {
     super.initState();
-    print(widget.item);
+    _initConnectivity();
+  }
+
+  void _initConnectivity() async {
+    bool _isConnected = await connectivity.isConnected();
+    if (!_isConnected) {
+      ConnectivityService.noInternetDialog(context);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final String reference = widget.item['reference'] ?? '';
+    final String pickup_address = widget.item['pickup_other_address'] ?? '';
+    final String delivery_address = widget.item['delivery_other_address'] ?? '';
+    final String task = widget.item['task'] ?? '';
     final String customer = widget.item['customer'] ?? '';
     final String remarks = widget.item['remarks'] ?? '';
+    final String address = widget.item['address'] ?? '';
     final String pickupLoc = widget.item['pickup_loc'] ?? '';
     final String deliveryLoc = widget.item['delivery_loc'] ?? '';
     final String serviceType = widget.item['service_type'] ?? '';
     final totalCbm = widget.item['total_cbm'] ?? '';
     final totalQty = widget.item['total_qty'] ?? '';
     final totalWt = widget.item['total_wt'] ?? '';
-    final TextEditingController item_height =
+    final TextEditingController itemHeight =
         TextEditingController(text: widget.item['item_height'].toString());
-    final TextEditingController item_length =
+    final TextEditingController itemLength =
         TextEditingController(text: widget.item['item_length'].toString());
-    final TextEditingController item_width =
+    final TextEditingController itemWidth =
         TextEditingController(text: widget.item['item_width'].toString());
-    final item_cbm = widget.item['item_cbm'] ?? '';
-    final TextEditingController item_qty =
+    final itemCbm = widget.item['item_cbm'] ?? '';
+    final TextEditingController itemQty =
         TextEditingController(text: widget.item['item_qty'].toString());
-    final item_weight = widget.item['item_weight'] ?? '';
+    final itemWeight = widget.item['item_weight'] ?? '';
     final String tripType = widget.item['trip_type'] ?? '';
 
     final TextEditingController actualQty =
         TextEditingController(text: widget.item['item_qty'].toString());
+
+    DateTime est_pick =
+        DateTime.parse(widget.item['pickup_expected_date'] ?? '');
+    final pickup_dtime = DateFormat('MMM d,yyyy h:mm a').format(est_pick);
+    DateTime est_dlv =
+        DateTime.parse(widget.item['delivery_expected_date'] ?? '');
+    final deliver_dtime = DateFormat('MMM d,yyyy h:mm a').format(est_dlv);
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: AppBar(title: const Text('Booking Details'), actions: [
@@ -69,28 +91,28 @@ class _BookingDetailState extends State<BookingDetailPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                          alignment: Alignment.centerLeft,
-                          padding: const EdgeInsets.all(4),
-                          child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Ref# : $reference',
-                                  style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                const Text('April 19, 2023',
-                                    style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold))
-                              ])),
-                      const Divider(),
                       Expanded(
                           child: Column(
                         mainAxisAlignment: MainAxisAlignment.start,
                         children: [
+                          ListTile(
+                            leading: const Icon(Icons.numbers),
+                            title: Text(
+                              'Reference',
+                              style: TextStyle(
+                                  fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(reference,
+                                    style: const TextStyle(
+                                        color: Colors.red,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
                           ListTile(
                             leading: const Icon(Icons.person),
                             title: const Text(
@@ -105,19 +127,12 @@ class _BookingDetailState extends State<BookingDetailPage> {
                                     style: const TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold)),
-                                const Text('DR #: 09867896242',
-                                    style: TextStyle(fontSize: 11)),
-                                const Text('Invoice #: 09867896242',
-                                    style: TextStyle(fontSize: 11)),
-                                Text('Service : $serviceType',
-                                    style: const TextStyle(fontSize: 11)),
                               ],
                             ),
                             // trailing: Text('May 1, 2023'),
                           ),
-                          const Divider(),
                           ListTile(
-                            leading: Icon(Icons.location_on),
+                            leading: const Icon(Icons.location_on),
                             title: const Text(
                               'Pick Up',
                               style: TextStyle(
@@ -126,68 +141,25 @@ class _BookingDetailState extends State<BookingDetailPage> {
                             subtitle: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                    'Nilo Besingga',
+                                  Text(
+                                    pickup_dtime,
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.red,
+                                        overflow: TextOverflow.ellipsis),
+                                  ),
+                                  Text(
+                                    pickupLoc,
                                     style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold),
                                   ),
-                                  const Text(
-                                    'May 1, 2023 11:24 AM',
-                                    style: TextStyle(
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                                  const Text('09353330652',
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold)),
                                   Text(
-                                    pickupLoc,
+                                    pickup_address,
                                     style: const TextStyle(
-                                        fontSize: 11,
-                                        overflow: TextOverflow.ellipsis),
-                                  ),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            TextField(
-                                              controller: item_qty,
-                                              readOnly: true,
-                                              decoration: const InputDecoration(
-                                                labelText: 'Qty',
-                                              ),
-                                              style:
-                                                  const TextStyle(fontSize: 11),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(
-                                        width: 10.0,
-                                        height: 10.0,
-                                      ),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.end,
-                                          children: [
-                                            TextField(
-                                              controller: actualQty,
-                                              keyboardType: TextInputType.text,
-                                              decoration: const InputDecoration(
-                                                labelText: 'Actual Qty',
-                                              ),
-                                              style:
-                                                  const TextStyle(fontSize: 11),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold),
                                   ),
                                 ]),
                             // trailing: const Text(
@@ -196,7 +168,6 @@ class _BookingDetailState extends State<BookingDetailPage> {
                             //       fontSize: 9, fontWeight: FontWeight.bold),
                             // ),
                           ),
-                          const Divider(),
                           ListTile(
                             leading: const Icon(
                               Icons.pin_drop,
@@ -209,38 +180,99 @@ class _BookingDetailState extends State<BookingDetailPage> {
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Nilo Besingga',
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                const Text(
-                                  'May 1, 2023 11:24 AM',
-                                  style: TextStyle(
-                                      fontSize: 9, fontWeight: FontWeight.bold),
-                                ),
-                                const Text('09353330652',
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.bold)),
                                 Text(
-                                  deliveryLoc,
+                                  deliver_dtime,
                                   style: const TextStyle(
-                                      fontSize: 11,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.red,
                                       overflow: TextOverflow.ellipsis),
                                 ),
-                                Row(
-                                  children: [
+                                Text(
+                                  deliveryLoc,
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      overflow: TextOverflow.ellipsis,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                Text(
+                                  delivery_address,
+                                  style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold),
+                                )
+                              ],
+                            ),
+                            // trailing: const Text(
+                            //   'May 1, 2023 11:26 AM',
+                            //   style: TextStyle(
+                            //       fontSize: 9, fontWeight: FontWeight.bold),
+                            // ),
+                          ),
+                          ListTile(
+                              leading: const Icon(
+                                Icons.view_in_ar,
+                              ),
+                              title: const Text(
+                                'Item Details',
+                                style: TextStyle(
+                                    fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Column(
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            TextField(
+                                              controller: itemQty,
+                                              readOnly: true,
+                                              decoration: const InputDecoration(
+                                                labelText: 'Qty',
+                                              ),
+                                              style:
+                                                  const TextStyle(fontSize: 12),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(
+                                        width: 10.0,
+                                        height: 10.0,
+                                      ),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            TextField(
+                                              controller: actualQty,
+                                              keyboardType: TextInputType.text,
+                                              decoration: const InputDecoration(
+                                                labelText: 'Actual Qty',
+                                              ),
+                                              style:
+                                                  const TextStyle(fontSize: 12),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Row(children: [
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
                                           TextField(
-                                            controller: item_qty,
+                                            controller: itemHeight,
                                             readOnly: true,
                                             decoration: const InputDecoration(
-                                              labelText: 'Qty',
+                                              labelText: 'Length',
                                             ),
                                             style:
                                                 const TextStyle(fontSize: 11),
@@ -258,10 +290,11 @@ class _BookingDetailState extends State<BookingDetailPage> {
                                             CrossAxisAlignment.start,
                                         children: [
                                           TextField(
-                                            controller: actualQty,
+                                            controller: itemLength,
+                                            readOnly: true,
                                             keyboardType: TextInputType.text,
                                             decoration: const InputDecoration(
-                                              labelText: 'Actual Qty',
+                                              labelText: 'Width',
                                             ),
                                             style:
                                                 const TextStyle(fontSize: 11),
@@ -269,86 +302,29 @@ class _BookingDetailState extends State<BookingDetailPage> {
                                         ],
                                       ),
                                     ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            // trailing: const Text(
-                            //   'May 1, 2023 11:26 AM',
-                            //   style: TextStyle(
-                            //       fontSize: 9, fontWeight: FontWeight.bold),
-                            // ),
-                          ),
-                          const Divider(),
-                          ListTile(
-                              leading: const Icon(
-                                Icons.view_in_ar,
-                              ),
-                              title: const Text(
-                                'Item Details',
-                                style: TextStyle(
-                                    fontSize: 12, fontWeight: FontWeight.bold),
-                              ),
-                              subtitle: Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        TextField(
-                                          controller: item_height,
-                                          readOnly: true,
-                                          decoration: const InputDecoration(
-                                            labelText: 'Length',
-                                          ),
-                                          style: const TextStyle(fontSize: 11),
-                                        ),
-                                      ],
+                                    const SizedBox(
+                                      width: 10.0,
+                                      height: 10.0,
                                     ),
-                                  ),
-                                  const SizedBox(
-                                    width: 10.0,
-                                    height: 10.0,
-                                  ),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        TextField(
-                                          controller: item_length,
-                                          readOnly: true,
-                                          keyboardType: TextInputType.text,
-                                          decoration: const InputDecoration(
-                                            labelText: 'Width',
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          TextField(
+                                            controller: itemWidth,
+                                            readOnly: true,
+                                            keyboardType: TextInputType.text,
+                                            decoration: const InputDecoration(
+                                              labelText: 'Height',
+                                            ),
+                                            style:
+                                                const TextStyle(fontSize: 11),
                                           ),
-                                          style: const TextStyle(fontSize: 11),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(
-                                    width: 10.0,
-                                    height: 10.0,
-                                  ),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        TextField(
-                                          controller: item_width,
-                                          readOnly: true,
-                                          keyboardType: TextInputType.text,
-                                          decoration: const InputDecoration(
-                                            labelText: 'Height',
-                                          ),
-                                          style: const TextStyle(fontSize: 11),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                                  ]),
                                 ],
                               )),
                           const Divider(),
@@ -362,7 +338,11 @@ class _BookingDetailState extends State<BookingDetailPage> {
                                 style: TextStyle(
                                     fontSize: 12, fontWeight: FontWeight.bold),
                               ),
-                              subtitle: Text(remarks)),
+                              subtitle: Text(remarks,
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.red))),
                         ],
                       ))
                     ],

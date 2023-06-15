@@ -1,13 +1,11 @@
 import 'dart:convert';
-
-import 'package:connectivity/connectivity.dart';
 import 'package:flutter/material.dart';
-// import 'package:flutter/services.dart';
+import 'package:drive/connectivity_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import 'package:drive/welcome.dart';
-
 import 'services/api_service.dart';
+import 'package:package_info/package_info.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -17,24 +15,21 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   ApiService apiService = ApiService();
+  ConnectivityService connectivity = ConnectivityService();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
 
   FocusNode textFieldFocusNode = FocusNode();
   bool _obscured = true;
-  final bool _isLoading = false;
-  final bool _loginSuccess = false;
-  late AnimationController _animationController;
   bool _showClearIcon = false;
+  String _appVersion = '';
+  String latestVersion = '';
+  String url = '';
 
   @override
   void initState() {
     super.initState();
     textFieldFocusNode.requestFocus();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      checkConnectivity(context);
-    });
-
     _usernameController.addListener(() {
       setState(() {
         _showClearIcon = _usernameController.text.isNotEmpty;
@@ -56,44 +51,56 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
-  _showMsg(msg) {
-    final snackBar = SnackBar(
-      backgroundColor: const Color(0xFF363f93),
-      content: Text(msg),
-      action: SnackBarAction(
-        label: 'Close',
-        onPressed: () {
-          // Some code to undo the change!
-        },
-      ),
-    );
-    ScaffoldMessenger.of(context).showSnackBar(snackBar);
-  }
-
   _login() async {
-    bool connected = await checkInternetConnection();
-    if (connected) {
+    bool _isConnected = await connectivity.isConnected();
+    if (!_isConnected) {
+      ConnectivityService.noInternetDialog(context);
+    } else {
       var data = {
         'username': _usernameController.text,
         'password': _passwordController.text,
+        'device': 'mobile'
       };
       var res = await apiService.postData(data, 'login');
       if (res['success']) {
         SharedPreferences prefs = await SharedPreferences.getInstance();
+        res['data']['plate_no'] = res['data']['record']['assigned_vehicle'];
+        res['data']['plate_id'] =
+            res['data']['record']['assigned_vehicle_value'];
+        res['data']['trucker'] = res['data']['record']['trucker'];
+        res['data']['driver_contact'] = res['data']['record']['driver_contact'];
         prefs.setString('token', res['data']['api_token']);
         prefs.setBool('isLoggedIn', true);
         prefs.setString('user', json.encode(res['data']));
+
+        PackageInfo packageInfo = await PackageInfo.fromPlatform();
         setState(() {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            backgroundColor: Colors.green,
-            content: Text('Login Successfully'),
-            behavior: SnackBarBehavior.floating,
-          ));
+          _appVersion = packageInfo.version;
         });
-        setState(() {
-          Navigator.push(context,
-              MaterialPageRoute(builder: (context) => const WelcomePage()));
-        });
+
+        final response = await apiService.getData('app-version');
+        if (response.statusCode == 200) {
+          final responseData = json.decode(response.body);
+          var data = responseData['data'];
+          latestVersion = data['version'];
+          url = data['url_link'];
+
+          setState(() {
+            if (_appVersion.toString() != latestVersion.toString()) {
+              appUpdate(context, url);
+            } else {
+              _usernameController.clear();
+              _passwordController.clear();
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (context) => const WelcomePage()));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                backgroundColor: Colors.green,
+                content: Text('Login Successfully'),
+                behavior: SnackBarBehavior.floating,
+              ));
+            }
+          });
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           backgroundColor: Colors.red,
@@ -101,42 +108,45 @@ class _LoginPageState extends State<LoginPage> {
           behavior: SnackBarBehavior.floating,
         ));
       }
-    } else {
-      checkConnectivity;
     }
   }
 
-  Future<bool> checkInternetConnection() async {
-    var connectivityResult = await (Connectivity().checkConnectivity());
-    if (connectivityResult == ConnectivityResult.mobile ||
-        connectivityResult == ConnectivityResult.wifi) {
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-  void checkConnectivity(BuildContext context) async {
-    var connectivityResult = await (Connectivity().checkConnectivity());
-    if (connectivityResult == ConnectivityResult.none) {
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: const Text('No Internet Connection'),
-            content: const Text('Please check your internet connection.'),
-            actions: <Widget>[
-              FilledButton(
-                child: const Text('OK'),
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
+  Future<void> appUpdate(BuildContext context, url) {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Update Required'),
+          content: Text(
+              'A new version of the app is available. Please update to continue using the app.'),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade900,
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
               ),
-            ],
-          );
-        },
-      );
-    }
+              child: Text('Update Now'),
+              onPressed: () async {
+                SharedPreferences prefs = await SharedPreferences.getInstance();
+                await prefs.clear();
+                setState(() {
+                  launchUrl(Uri.parse(url));
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LoginPage()),
+                    (Route<dynamic> route) => false,
+                  );
+                });
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _toggleObscured() {
@@ -149,22 +159,18 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
-  // void showSoftKeyboard() {
-  //   SystemChannels.textInput.invokeMethod('TextInput.show');
-  // }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
         resizeToAvoidBottomInset: false,
         body: Container(
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
                 image: DecorationImage(
               image: AssetImage('assets/images/maps.jpg'),
               fit: BoxFit.cover,
             )),
             child: Padding(
-                padding: EdgeInsets.all(12.0),
+                padding: const EdgeInsets.all(12.0),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -174,9 +180,9 @@ class _LoginPageState extends State<LoginPage> {
                       height: 70,
                       width: 70,
                     ),
-                    SizedBox(height: 60.0),
+                    const SizedBox(height: 60.0),
                     TextField(
-                      style: TextStyle(
+                      style: const TextStyle(
                           color: Colors.black, fontWeight: FontWeight.bold),
                       controller: _usernameController,
                       keyboardType: TextInputType.text,
@@ -187,31 +193,32 @@ class _LoginPageState extends State<LoginPage> {
                         // filled: true,
                         // fillColor: Colors.grey.shade300,
                         labelText: 'Username',
-                        labelStyle: TextStyle(color: Colors.black),
+                        labelStyle: const TextStyle(color: Colors.black),
                         prefixIcon: const Icon(Icons.person, size: 24),
                         prefixIconColor: Colors.black,
                         enabledBorder: OutlineInputBorder(
                           borderSide:
-                              BorderSide(color: Colors.black, width: 2.0),
+                              const BorderSide(color: Colors.black, width: 2.0),
                           borderRadius: BorderRadius.circular(70.0),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.red, width: 2.0),
+                          borderSide:
+                              const BorderSide(color: Colors.red, width: 2.0),
                           borderRadius: BorderRadius.circular(70.0),
                         ),
                         suffixIcon: _showClearIcon
                             ? IconButton(
-                                icon: Icon(Icons.clear),
+                                icon: const Icon(Icons.clear),
                                 onPressed: _clearText,
                               )
                             : null,
                       ),
                     ),
-                    SizedBox(height: 16.0),
+                    const SizedBox(height: 16.0),
                     TextField(
                       controller: _passwordController,
                       keyboardType: TextInputType.visiblePassword,
-                      style: TextStyle(
+                      style: const TextStyle(
                           color: Colors.black, fontWeight: FontWeight.bold),
                       obscureText: _obscured,
                       decoration: InputDecoration(
@@ -219,7 +226,7 @@ class _LoginPageState extends State<LoginPage> {
                           borderRadius: BorderRadius.circular(90.0),
                         ),
                         labelText: 'Password',
-                        labelStyle: TextStyle(color: Colors.black),
+                        labelStyle: const TextStyle(color: Colors.black),
                         prefixIcon: const Icon(Icons.lock_rounded, size: 24),
                         suffixIcon: Padding(
                           padding: const EdgeInsets.fromLTRB(0, 0, 4, 0),
@@ -236,19 +243,21 @@ class _LoginPageState extends State<LoginPage> {
                         prefixIconColor: Colors.black,
                         enabledBorder: OutlineInputBorder(
                           borderSide:
-                              BorderSide(color: Colors.black, width: 2.0),
+                              const BorderSide(color: Colors.black, width: 2.0),
                           borderRadius: BorderRadius.circular(70.0),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.red, width: 2.0),
+                          borderSide:
+                              const BorderSide(color: Colors.red, width: 2.0),
                           borderRadius: BorderRadius.circular(70.0),
                         ),
                       ),
                     ),
-                    SizedBox(height: 24.0),
+                    const SizedBox(height: 24.0),
                     ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                            backgroundColor: Color.fromARGB(255, 222, 8, 8),
+                            backgroundColor:
+                                const Color.fromARGB(255, 222, 8, 8),
                             minimumSize: const Size.fromHeight(50),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(20),

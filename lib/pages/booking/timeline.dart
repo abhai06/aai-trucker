@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:timeline_tile/timeline_tile.dart';
 import 'package:drive/helper/db_helper.dart';
+import 'package:drive/connectivity_service.dart';
 
 class Timeline extends StatefulWidget {
   final item;
@@ -14,6 +15,8 @@ class Timeline extends StatefulWidget {
 
 class _TimelineState extends State<Timeline> {
   DBHelper dbHelper = DBHelper();
+  ConnectivityService connectivity = ConnectivityService();
+
   List events = [];
   bool isLoading = false;
   Future<List<dynamic>> logs() async {
@@ -34,10 +37,30 @@ class _TimelineState extends State<Timeline> {
     super.initState();
   }
 
+  void _initConnectivity() async {
+    bool _isConnected = await connectivity.isConnected();
+    if (!_isConnected) {
+      ConnectivityService.noInternetDialog(context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(title: const Text("Timeline")),
+        appBar: AppBar(
+          title: const Text("Status Logs"),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 16.0),
+              child: Center(
+                child: Text(
+                  widget.item['reference'] ?? '',
+                  style: TextStyle(fontSize: 16),
+                ),
+              ),
+            ),
+          ],
+        ),
         body: isLoading
             ? Center(
                 child: Lottie.asset(
@@ -56,7 +79,8 @@ class _TimelineState extends State<Timeline> {
                         itemCount: events.length,
                         itemBuilder: (context, int index) {
                           final history = events[index];
-                          final signature = history['signature'] ?? '';
+                          // final signature = history['signature'] ?? '';
+                          int flag = history['flag'] ?? 0;
                           return TimelineTile(
                             alignment: TimelineAlign.manual,
                             lineXY: 0.1,
@@ -71,44 +95,54 @@ class _TimelineState extends State<Timeline> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   ListTile(
-                                      title: Text(
-                                        history['task_code'],
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
+                                    title: Text(
+                                      history['task_code'],
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    subtitle: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          history['task'],
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                          ),
                                         ),
-                                      ),
-                                      subtitle: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            history['task'],
-                                            style: const TextStyle(
+                                        Text(
+                                          history['datetime'] ?? '',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        Text(
+                                          history['note'],
+                                          style: const TextStyle(
                                               fontSize: 12,
-                                            ),
+                                              overflow: TextOverflow.ellipsis),
+                                        ),
+                                        Text(
+                                          (history['task_code'] == 'FIU')
+                                              ? 'Receive By : ${history['contact_person'] ?? ''}'
+                                              : '',
+                                          style: const TextStyle(
+                                            fontSize: 12,
                                           ),
-                                          Text(
-                                            history['datetime'] ?? '',
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                          Text(
-                                            history['note'],
-                                            style: const TextStyle(
-                                                fontSize: 12,
-                                                overflow:
-                                                    TextOverflow.ellipsis),
-                                          ),
-                                        ],
-                                      ),
-                                      trailing: GestureDetector(
-                                          child: const Icon(Icons.draw,
-                                              color: Colors.grey),
-                                          onTap: () {
-                                            _showSignature(context, signature);
-                                          })),
+                                        )
+                                      ],
+                                    ),
+                                    // trailing: GestureDetector(
+                                    //     onTap: () {
+                                    //       _showSignature(context, signature);
+                                    //     },
+                                    //     child: (history['task_code'] == 'FIU')
+                                    //         ? Icon(Icons.draw,
+                                    //             color: Colors.grey)
+                                    //         : Text(''))
+                                  ),
                                 ],
                               ),
                               // ),
@@ -116,11 +150,12 @@ class _TimelineState extends State<Timeline> {
                             isFirst: false,
                             indicatorStyle: IndicatorStyle(
                               width: 40,
-                              color: Colors.red,
+                              color: (flag == 1) ? Colors.green : Colors.blue,
                               padding: const EdgeInsets.all(8),
                               iconStyle: IconStyle(
                                 color: Colors.white,
-                                iconData: Icons.subdirectory_arrow_right,
+                                iconData:
+                                    (flag == 1) ? Icons.check : Icons.sync,
                               ),
                             ),
                             beforeLineStyle: const LineStyle(
@@ -153,7 +188,7 @@ class _TimelineState extends State<Timeline> {
                 child: sign != 'null'
                     ? Image.memory(
                         base64Decode(sign),
-                        key: UniqueKey(), // Use UniqueKey() as the key
+                        key: UniqueKey(),
                       )
                     : const Text('No Signature')),
           );

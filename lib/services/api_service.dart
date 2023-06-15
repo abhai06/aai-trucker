@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiService {
-  final String baseUrl = 'http://192.168.200.116:8000/api/v1';
+  final baseUrl = dotenv.env['BASE_URL'];
   postData(data, apiUrl) async {
     var response = await http.post(Uri.parse('$baseUrl/$apiUrl'),
         body: jsonEncode(data), headers: _setHeaders());
@@ -21,6 +22,7 @@ class ApiService {
       var head = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        'Charset': 'utf-8',
         'Authorization': 'Bearer $bearerToken',
       };
       var url =
@@ -44,6 +46,7 @@ class ApiService {
     final headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      'Charset': 'utf-8',
       'Authorization': 'Bearer $bearerToken'
     };
     final url = Uri.parse('$baseUrl/$apiUrl/$id');
@@ -61,11 +64,12 @@ class ApiService {
     final headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      'Charset': 'utf-8',
       'Authorization': 'Bearer $bearerToken'
     };
 
     var url = Uri.parse('$baseUrl/$apiUrl').replace(
-        queryParameters: params != null ? _getQueryParams(params) : null);
+        queryParameters: params != null ? _getQueryParams(params) : params);
     return http.get(url, headers: headers);
   }
 
@@ -79,6 +83,7 @@ class ApiService {
   _setHeaders() => {
         'Content-type': 'application/json',
         'Accept': 'application/json',
+        'Charset': 'utf-8',
       };
 
   Future<Map<String, dynamic>?> getUserData() async {

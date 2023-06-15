@@ -1,25 +1,38 @@
-import 'package:drive/home.dart';
-import 'package:drive/login.dart';
-import 'package:drive/maps/maps.dart';
-import 'package:flutter/material.dart';
-import 'package:drive/services/api_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-// import 'package:flutter_background/flutter_background.dart';
-// import 'package:background_fetch/background_fetch.dart';
-import 'package:connectivity/connectivity.dart';
-import 'package:drive/helper/db_helper.dart';
-import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'dart:async';
 import 'dart:convert';
-// import 'package:path_provider/path_provider.dart';
-import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
-
 import 'dart:io';
+import 'dart:ui';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:path/path.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
+// import 'package:workmanager/workmanager.dart';
+// import 'package:background_fetch/background_fetch.dart';
+import 'package:drive/connectivity_service.dart';
+import 'package:drive/helper/db_helper.dart';
+import 'package:drive/login.dart';
+import 'package:drive/main_screen.dart';
+import 'package:drive/pages/exceptionlist.dart';
+import 'package:drive/pages/runsheet.dart';
+import 'package:drive/pages/tasklist.dart';
+import 'package:drive/services/api_service.dart';
+import 'package:drive/service.dart';
+// import 'package:drive/sync_background.dart';
+// import 'package:drive/sync_worker.dart';
+// import 'package:package_info/package_info.dart';
+// import 'package:url_launcher/url_launcher.dart';
+// import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 void main() async {
-  runApp(const MyApp());
+  await dotenv.load();
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+  runApp(const MyApp());
+  ConnectivityService.initialize();
 }
 
 class MyApp extends StatefulWidget {
@@ -30,20 +43,32 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  Service service = Service();
+  late BuildContext dialogContext;
+  Timer? _timer;
   final ApiService apiService = ApiService();
+  ConnectivityService connectivity = ConnectivityService();
   DBHelper dbHelper = DBHelper();
+  Runsheet runsheet = Runsheet();
+  Tasklist tasklist = Tasklist();
+  Exceptionlist exceptionlist = Exceptionlist();
   bool isLoggedIn = false;
   List runsheetList = [];
   List bookingList = [];
-  final bool _isDarkMode = false;
   bool isDatabaseInitialized = false;
+  Map<String, dynamic> driver = {};
+
+  String currentVersion = '';
+
+  bool _enabled = true;
+  int _status = 0;
+  List<DateTime> _events = [];
 
   final ThemeData kLightTheme = ThemeData(
     appBarTheme: const AppBarTheme(
       color: Colors.red, // Set the app bar color to blue
     ),
     brightness: Brightness.light,
-    // primarySwatch: Colors.blue,
   );
 
   final ThemeData kDarkTheme = ThemeData(
@@ -57,9 +82,32 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+    _initConnectivity();
+    Timer.periodic(Duration(seconds: 20), (timer) {
+      service.syncData();
+    });
     initialization();
     openDatabaseOrInitialize();
     checkLoggedIn();
+  }
+
+  @override
+  void dispose() {
+    _timer!.cancel();
+    super.dispose();
+  }
+
+  void _initConnectivity() async {
+    bool _isConnected = await connectivity.isConnected();
+    if (_isConnected) {
+      final params = {
+        'page': 1,
+        'filter': jsonEncode({'plate_no': driver['plate_id']}),
+        'itemsPerPage': '999',
+        'device': 'mobile'
+      };
+      await runsheet.runsheet(params);
+    }
   }
 
   void openDatabaseOrInitialize() async {
@@ -84,134 +132,33 @@ class _MyAppState extends State<MyApp> {
   void checkLoggedIn() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     final authToken = prefs.getString('token');
+    final userdata = prefs.getString('user');
     isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
     if (isLoggedIn) {
-      final data = await dbHelper.getAll('runsheet');
-      final booking = await dbHelper.getAll('booking');
-      if (data.isEmpty || booking.isEmpty) {
-        exception();
-        tasklist();
-        runsheet();
+      setState(() {
+        driver = json.decode(userdata!);
+      });
+      final task = await dbHelper.getAll('tasks');
+      final except = await dbHelper.getAll('exception');
+      if (task.isEmpty) {
+        tasklist.tasklist({'itemsPerPage': -1, 'group_by': 4});
       }
-    }
-    // else {
-    //   SharedPreferences prefs = await SharedPreferences.getInstance();
-    //   await prefs.clear();
-    //   setState(() {
-    //     Navigator.pushAndRemoveUntil(
-    //       context as BuildContext,
-    //       MaterialPageRoute(builder: (context) => LoginPage()),
-    //       (Route<dynamic> route) => false,
-    //     );
-    //   });
-    // }
-  }
-
-  Future<bool> checkInternetConnection() async {
-    var connectivityResult = await (Connectivity().checkConnectivity());
-    if (connectivityResult == ConnectivityResult.mobile ||
-        connectivityResult == ConnectivityResult.wifi) {
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-  Future<void> runsheet() async {
-    var filter = {'plate_no': 'ABC123'};
-    final params = {'page': 1, 'filter': jsonEncode(filter)};
-    final response = await apiService.getData('runsheet', params: params);
-
-    if (response.statusCode == 200) {
-      final responseData = json.decode(response.body);
-      var data = responseData['data']['data'];
-      var book = [];
-      runsheetList = data.map((rn) {
-        rn['item_details'].forEach((key, value) {
-          book.add(value);
-        });
-        return {
-          'id': rn['id'],
-          'runsheet_id': rn['id'],
-          'cbm': rn['cbm'],
-          'charging_type': rn['charging_type'],
-          'date_from': rn['date_from'],
-          'date_to': rn['date_to'],
-          'dr_no': rn['dr_no'],
-          'est_tot_cbm': rn['est_tot_cbm'],
-          'est_tot_pcs': rn['est_tot_pcs'],
-          'est_tot_wt': rn['est_tot_wt'],
-          'from_loc': rn['from_loc'],
-          'plate_no': rn['plate_no'],
-          'reference': rn['reference'],
-          'remarks': rn['remarks'],
-          'status': rn['status'],
-          'task': rn['task'],
-          'to_loc': rn['to_loc'],
-          'total_pcs': rn['total_pcs'],
-          'total_wt': rn['total_wt'],
-          'tracking_no': rn['tracking_no'],
-          'trucking_id': rn['trucking_id'],
-          'updated_at': rn['updated_at'],
-          'user_id': rn['user_id'],
-          'vehicle_id': rn['vehicle_id'],
-          'vehicle_type': rn['vehicle_type']
-        };
-      }).toList();
-      await dbHelper.save('runsheet', runsheetList);
-      await dbHelper.save('booking', book);
-    } else {
-      print('Error: ${response.reasonPhrase}');
-    }
-  }
-
-  Future<void> tasklist() async {
-    await dbHelper.truncateTable('tasks');
-    final response = await apiService
-        .getData('tasks', params: {'itemsPerPage': -1, 'group_by': 4});
-    if (response.statusCode == 200) {
-      final responseData = json.decode(response.body);
-      var data = responseData['data']['data'];
-      List task = data.map((tks) {
-        return {
-          'id': tks['id'],
-          'code': tks['code'],
-          'name': tks['name'],
-          'sequence_no': tks['sequence_no'],
-          'task': tks['task']
-        };
-      }).toList();
-      await dbHelper.save('tasks', task);
-    } else {
-      print('Error: ${response.reasonPhrase}');
-    }
-  }
-
-  Future<void> exception() async {
-    await dbHelper.truncateTable('exception');
-    final response = await apiService.getData('exception_actions');
-    if (response.statusCode == 200) {
-      final responseData = json.decode(response.body);
-      var data = responseData['data'];
-      List except = data.map((tks) {
-        return {
-          'code': tks['code'],
-          'name': tks['name'],
-          'description': tks['description'],
-          'task_id': tks['task_id']
-        };
-      }).toList();
-      await dbHelper.save('exception', except);
-    } else {
-      print('Error: ${response.reasonPhrase}');
+      if (except.isEmpty) {
+        exceptionlist.exception();
+      }
+      final params = {
+        'page': 1,
+        'filter': jsonEncode({'plate_no': driver['plate_id']}),
+        'itemsPerPage': '999'
+      };
+      runsheet.runsheet(params);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-        theme: isDarkMode ? kDarkTheme : kLightTheme, home: LoginPage()
-        // home: isLoggedIn ? WelcomePage() : LoginPage(),
-        );
+        theme: isDarkMode ? kDarkTheme : kLightTheme,
+        home: isLoggedIn ? const MainScreen() : const LoginPage());
   }
 }

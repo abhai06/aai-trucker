@@ -9,6 +9,11 @@ import 'package:drive/helper/db_helper.dart';
 import 'package:drive/main_screen.dart';
 import 'package:drive/services/api_service.dart';
 
+import 'package:drive/pages/runsheet.dart';
+import 'package:drive/pages/tasklist.dart';
+import 'package:drive/pages/exceptionlist.dart';
+import 'package:drive/connectivity_service.dart';
+
 class WelcomePage extends StatefulWidget {
   const WelcomePage({Key? key}) : super(key: key);
 
@@ -18,7 +23,12 @@ class WelcomePage extends StatefulWidget {
 
 class _WelcomePageState extends State<WelcomePage> {
   final ApiService apiService = ApiService();
+  ConnectivityService connectivity = ConnectivityService();
   DBHelper dbHelper = DBHelper();
+  Runsheet runsheet = Runsheet();
+  Tasklist tasklist = Tasklist();
+  Exceptionlist exceptionlist = Exceptionlist();
+
   List runsheetList = [];
   List bookingList = [];
   bool _isLoading = true;
@@ -30,122 +40,23 @@ class _WelcomePageState extends State<WelcomePage> {
       setState(() {
         driver = json.decode(userdata!);
       });
-      final task = await dbHelper.getAll('tasks');
-      print(task);
-
-      final except = await dbHelper.getAll('exception');
-      print(except);
-
-      if (task.isEmpty || except.isEmpty) {
-        exception();
-        tasklist();
-      }
-      runsheet();
+      final task = {'itemsPerPage': '-1', 'group_by': '4'};
+      tasklist.tasklist(task);
+      exceptionlist.exception();
+      final params = {
+        'page': '1',
+        'filter': jsonEncode({'plate_no': driver['plate_id']}),
+        'itemsPerPage': '999',
+        'device': 'mobile'
+      };
+      runsheet.runsheet(params);
     } else {
       user_info;
     }
   }
 
-  Future<void> runsheet() async {
-    var filter = {'plate_no': 'ABC123'};
-    final params = {'page': 1, 'filter': {}};
-    final response = await apiService.getData('runsheet', params: params);
-    if (response.statusCode == 200) {
-      final responseData = json.decode(response.body);
-      var data = responseData['data']['data'];
-      var book = [];
-      List<Map<String, dynamic>> booking = [];
-      runsheetList = data.map((rn) {
-        if (rn['task'].length > 0) {
-          rn['task'].forEach((key, value) {
-            value['runsheet_id'] = rn['id'];
-            booking.add(Map<String, dynamic>.from(value));
-          });
-        }
-        return {
-          'id': rn['id'],
-          'runsheet_id': rn['id'],
-          'cbm': rn['cbm'],
-          'charging_type': rn['charging_type'],
-          'date_from': rn['date_from'],
-          'date_to': rn['date_to'],
-          'ar_no': rn['ar_no'],
-          'dr_no': rn['dr_no'],
-          'est_tot_cbm': rn['est_tot_cbm'],
-          'est_tot_pcs': rn['est_tot_pcs'],
-          'est_tot_wt': rn['est_tot_wt'],
-          'from_loc': rn['from_loc'],
-          'plate_no': rn['plate_no'],
-          'reference': rn['reference'],
-          'remarks': rn['remarks'],
-          'status': rn['status'],
-          'task': rn['task'],
-          'to_loc': rn['to_loc'],
-          'total_pcs': rn['total_pcs'],
-          'total_wt': rn['total_wt'],
-          'tracking_no': rn['tracking_no'],
-          'trucking_id': rn['trucking_id'],
-          'updated_at': rn['updated_at'],
-          'user_id': rn['user_id'],
-          'vehicle_id': rn['vehicle_id'],
-          'vehicle_type': rn['vehicle_type']
-        };
-      }).toList();
-      await dbHelper.save('runsheet', runsheetList, pkey: 'runsheet_id');
-      if (booking.isNotEmpty) {
-        await dbHelper.saveBooking('booking', booking);
-      }
-    } else {
-      print('Error: ${response.reasonPhrase}');
-    }
-  }
-
-  Future<void> tasklist() async {
-    await dbHelper.truncateTable('tasks');
-    final response = await apiService
-        .getData('tasks', params: {'itemsPerPage': -1, 'group_by': 4});
-    if (response.statusCode == 200) {
-      final responseData = json.decode(response.body);
-      var data = responseData['data']['data'];
-      List task = data.map((tks) {
-        return {
-          'id': tks['id'],
-          'code': tks['code'],
-          'name': tks['name'],
-          'sequence_no': tks['sequence_no'],
-          'task': tks['task']
-        };
-      }).toList();
-      await dbHelper.save('tasks', task, pkey: 'code');
-    } else {
-      print('Error: ${response.reasonPhrase}');
-    }
-  }
-
-  Future<void> exception() async {
-    await dbHelper.truncateTable('exception');
-    final response =
-        await apiService.getData('exception_actions', params: {'page': 0});
-    if (response.statusCode == 200) {
-      final responseData = json.decode(response.body);
-      var data = responseData['data']['data'];
-      List except = data.map((tks) {
-        return {
-          'code': tks['code'],
-          'name': tks['name'],
-          'description': tks['description'],
-          'task_id': tks['task_id']
-        };
-      }).toList();
-      await dbHelper.save('exception', except, pkey: 'code');
-    } else {
-      print('Error: ${response.reasonPhrase}');
-    }
-  }
-
   void _simulateLoading() async {
-    await Future.delayed(
-        const Duration(seconds: 2)); // Simulate loading with a delay
+    await Future.delayed(const Duration(seconds: 2));
     setState(() {
       user_info();
       _isLoading = false;
@@ -155,9 +66,15 @@ class _WelcomePageState extends State<WelcomePage> {
   @override
   void initState() {
     super.initState();
-    // exception();
+    _initConnectivity();
     _simulateLoading();
-    // user_info();
+  }
+
+  void _initConnectivity() async {
+    bool _isConnected = await connectivity.isConnected();
+    if (!_isConnected) {
+      ConnectivityService.noInternetDialog(context);
+    }
   }
 
   @override
@@ -176,6 +93,7 @@ class _WelcomePageState extends State<WelcomePage> {
               )
             : Center(
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 150),
@@ -213,12 +131,18 @@ class _WelcomePageState extends State<WelcomePage> {
                               fit: BoxFit.scaleDown,
                               child: Text('GO ONLINE'),
                             ),
-                            onPressed: () {
-                              Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (context) =>
-                                          const MainScreen()));
+                            onPressed: () async {
+                              bool _isConnected =
+                                  await connectivity.isConnected();
+                              if (!_isConnected) {
+                                ConnectivityService.noInternetDialog(context);
+                              } else {
+                                Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (context) =>
+                                            const MainScreen()));
+                              }
                             })),
                   ],
                 ),

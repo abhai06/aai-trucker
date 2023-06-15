@@ -7,22 +7,25 @@ import 'package:geolocator/geolocator.dart' as geolocator;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:google_maps_webservice/directions.dart' as direct;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:drive/connectivity_service.dart';
 
 class MapScreen extends StatefulWidget {
+  const MapScreen({Key? key}) : super(key: key);
+
   @override
   _MapScreenState createState() => _MapScreenState();
 }
 
 class _MapScreenState extends State<MapScreen> {
   late GoogleMapController mapController;
-  final directions = direct.GoogleMapsDirections(
-      apiKey: 'AIzaSyBOvEQPPHOW99eyq_AmvvQg8sJRXQH9pqk');
+  ConnectivityService connectivity = ConnectivityService();
+  final directions = direct.GoogleMapsDirections(apiKey: dotenv.env['API_KEY']);
+  final LatLng _pickupLocation = const LatLng(14.4377343, 121.003499);
+  final LatLng _deliveryLocation = const LatLng(14.481283, 121.005050);
 
-  LatLng _pickupLocation = LatLng(14.4377343, 121.003499);
-  LatLng _deliveryLocation = LatLng(14.481283, 121.005050);
-
-  Set<Polyline> _polylines = {};
-  Set<Marker> _markers = {};
+  final Set<Polyline> _polylines = {};
+  final Set<Marker> _markers = {};
   LatLng? _currentLocation;
 
   double distanceInMeters = 0;
@@ -75,11 +78,19 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
+    _initConnectivity();
     _getCurrentLocation();
     _calculateDistance();
     _getEstimatedTime();
     _resizeMarkerIcon();
     _getDirections();
+  }
+
+  void _initConnectivity() async {
+    bool _isConnected = await connectivity.isConnected();
+    if (!_isConnected) {
+      ConnectivityService.noInternetDialog(context);
+    }
   }
 
   Future<void> _resizeMarkerIcon() async {
@@ -124,9 +135,11 @@ class _MapScreenState extends State<MapScreen> {
         return AlertDialog(
           content: Row(
             children: [
-              Text(
-                  'Estimated Distance: ${(_calculateDistance() / 1000).toStringAsFixed(2)} km'),
-              Text('Estimated Time: ${duration}'),
+              Expanded(
+                  child: Text(
+                      'Estimated Distance: ${(_calculateDistance() / 1000).toStringAsFixed(2)} km')),
+              const SizedBox(height: 10.0),
+              Expanded(child: Text('Estimated Time: $duration')),
             ],
           ),
           actions: [
@@ -134,7 +147,7 @@ class _MapScreenState extends State<MapScreen> {
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: Text('Close'),
+              child: const Text('Close'),
             ),
           ],
         );
@@ -153,7 +166,7 @@ class _MapScreenState extends State<MapScreen> {
       setState(() {
         _polylines.add(Polyline(
             consumeTapEvents: true,
-            polylineId: PolylineId('route'),
+            polylineId: const PolylineId('route'),
             points: _convertToLatLng(_decodePolyline(route)),
             color: Colors.blue.shade900,
             width: 6,
@@ -162,17 +175,17 @@ class _MapScreenState extends State<MapScreen> {
             }));
 
         _markers.add(Marker(
-          markerId: MarkerId('pickup'),
+          markerId: const MarkerId('pickup'),
           position: _pickupLocation,
           icon: _pickUpIcon,
-          infoWindow: InfoWindow(title: 'Pickup Location'),
+          infoWindow: const InfoWindow(title: 'Pickup Location'),
         ));
 
         _markers.add(Marker(
-          markerId: MarkerId('delivery'),
+          markerId: const MarkerId('delivery'),
           position: _deliveryLocation,
           icon: _deliveryIcon,
-          infoWindow: InfoWindow(title: 'Delivery Location'),
+          infoWindow: const InfoWindow(title: 'Delivery Location'),
         ));
       });
     } catch (e) {
@@ -199,7 +212,7 @@ class _MapScreenState extends State<MapScreen> {
     List results = [];
 
     while (index < len) {
-      var b;
+      int b;
       var shift = 0;
       var result = 0;
       do {
@@ -234,7 +247,7 @@ class _MapScreenState extends State<MapScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Pickup and Delivery'),
+        title: const Text('Pickup and Delivery'),
       ),
       body: Stack(children: [
         GoogleMap(
@@ -255,7 +268,7 @@ class _MapScreenState extends State<MapScreen> {
           top: 5.0,
           left: 5.0,
           right: 5.0,
-          child: Container(
+          child: SizedBox(
               height: 40.0,
               child: TextField(
                 keyboardType: TextInputType.text,
@@ -263,11 +276,11 @@ class _MapScreenState extends State<MapScreen> {
                     filled: true,
                     fillColor: Colors.white,
                     enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.grey),
+                      borderSide: const BorderSide(color: Colors.grey),
                       borderRadius: BorderRadius.circular(70.0),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.red),
+                      borderSide: const BorderSide(color: Colors.red),
                       borderRadius: BorderRadius.circular(70.0),
                     ),
                     labelText: 'Pickup Location',
@@ -280,7 +293,7 @@ class _MapScreenState extends State<MapScreen> {
           top: 50.0,
           left: 5.0,
           right: 5.0,
-          child: Container(
+          child: SizedBox(
               height: 40.0,
               child: TextField(
                 keyboardType: TextInputType.text,
@@ -292,11 +305,11 @@ class _MapScreenState extends State<MapScreen> {
                   prefixIcon: const Icon(Icons.pin_drop, size: 24),
                   prefixIconColor: Colors.red,
                   enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.grey),
+                    borderSide: const BorderSide(color: Colors.grey),
                     borderRadius: BorderRadius.circular(70.0),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.red),
+                    borderSide: const BorderSide(color: Colors.red),
                     borderRadius: BorderRadius.circular(70.0),
                   ),
                 ),
@@ -305,12 +318,12 @@ class _MapScreenState extends State<MapScreen> {
       ]),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.red.shade900,
-        child: Icon(Icons.my_location),
+        child: const Icon(Icons.my_location),
         onPressed: () {
           mapController.animateCamera(
             CameraUpdate.newCameraPosition(
               CameraPosition(
-                target: _currentLocation ?? LatLng(0.0, 0.0),
+                target: _currentLocation ?? const LatLng(0.0, 0.0),
                 zoom: 11.0,
               ),
             ),
@@ -323,7 +336,7 @@ class _MapScreenState extends State<MapScreen> {
 }
 
 class Directions {
-  static const String _apiKey = 'AIzaSyBOvEQPPHOW99eyq_AmvvQg8sJRXQH9pqk';
+  static final _apiKey = dotenv.env['API_KEY'];
 
   static Future<String> getDirections(
       double startLat, double startLng, double endLat, double endLng) async {
