@@ -23,8 +23,9 @@ class _TimelineState extends State<Timeline> {
     setState(() {
       isLoading = true;
     });
-    final log = await dbHelper.getAll('booking_logs',
-        whereCondition: 'source_id=?', whereArgs: [widget.item['source_id']]);
+    final log = await dbHelper.getAll('booking_logs', whereCondition: 'source_id=?', whereArgs: [
+      widget.item['source_id']
+    ]);
     events = log;
     setState(() {
       isLoading = false;
@@ -38,8 +39,8 @@ class _TimelineState extends State<Timeline> {
   }
 
   void _initConnectivity() async {
-    bool _isConnected = await connectivity.isConnected();
-    if (!_isConnected) {
+    bool isConnected = await connectivity.isConnected();
+    if (!isConnected) {
       ConnectivityService.noInternetDialog(context);
     }
   }
@@ -55,7 +56,7 @@ class _TimelineState extends State<Timeline> {
               child: Center(
                 child: Text(
                   widget.item['reference'] ?? '',
-                  style: TextStyle(fontSize: 16),
+                  style: const TextStyle(fontSize: 16),
                 ),
               ),
             ),
@@ -103,8 +104,7 @@ class _TimelineState extends State<Timeline> {
                                       ),
                                     ),
                                     subtitle: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           history['task'],
@@ -120,14 +120,10 @@ class _TimelineState extends State<Timeline> {
                                         ),
                                         Text(
                                           history['note'],
-                                          style: const TextStyle(
-                                              fontSize: 12,
-                                              overflow: TextOverflow.ellipsis),
+                                          style: const TextStyle(fontSize: 12, overflow: TextOverflow.ellipsis),
                                         ),
                                         Text(
-                                          (history['task_code'] == 'FIU')
-                                              ? 'Receive By : ${history['contact_person'] ?? ''}'
-                                              : '',
+                                          (history['task_code'] == 'TDD') ? 'Receive By : ${history['contact_person'] ?? ''}' : '',
                                           style: const TextStyle(
                                             fontSize: 12,
                                           ),
@@ -154,14 +150,11 @@ class _TimelineState extends State<Timeline> {
                               padding: const EdgeInsets.all(8),
                               iconStyle: IconStyle(
                                 color: Colors.white,
-                                iconData:
-                                    (flag == 1) ? Icons.check : Icons.sync,
+                                iconData: (flag == 1) ? Icons.check : Icons.sync,
                               ),
                             ),
-                            beforeLineStyle: const LineStyle(
-                                color: Colors.red, thickness: 3),
-                            afterLineStyle: const LineStyle(
-                                color: Colors.red, thickness: 3),
+                            beforeLineStyle: const LineStyle(color: Colors.red, thickness: 3),
+                            afterLineStyle: const LineStyle(color: Colors.red, thickness: 3),
                           );
                         });
                   } else if (snapshot.hasError) {
@@ -169,7 +162,7 @@ class _TimelineState extends State<Timeline> {
                   } else {
                     return Center(
                         child: Lottie.asset(
-                      "assets/animations/nodata.json",
+                      "assets/animations/noitem.json",
                       animate: true,
                       alignment: Alignment.center,
                       height: 300,

@@ -1,9 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'dart:io';
 
-import 'package:camera/camera.dart';
 import 'package:connectivity/connectivity.dart';
 import 'package:drive/maps/maps.dart';
 import 'package:flutter/material.dart';
@@ -20,9 +19,12 @@ import 'package:drive/pages/exception.dart';
 import 'package:drive/services/api_service.dart';
 import 'package:phone_call/phone_call.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:drive/main_screen.dart';
 import 'package:drive/connectivity_service.dart';
-import 'package:http/http.dart' as http;
+import 'package:path/path.dart' as path;
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:reactive_date_time_picker/reactive_date_time_picker.dart';
+import 'package:reactive_forms/reactive_forms.dart';
 
 class BookingListPage extends StatefulWidget {
   final item;
@@ -32,14 +34,13 @@ class BookingListPage extends StatefulWidget {
   State<BookingListPage> createState() => _BookingListPageState();
 }
 
-class _BookingListPageState extends State<BookingListPage>
-    with SingleTickerProviderStateMixin {
+class _BookingListPageState extends State<BookingListPage> with SingleTickerProviderStateMixin {
   TabController? _tabController;
   int _selectedTabIndex = 0;
 
   final GlobalKey<SignatureState> _signatureKey = GlobalKey<SignatureState>();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final scrollController = ScrollController();
-  Uint8List? _signatureData;
   DBHelper dbHelper = DBHelper();
   ConnectivityService connectivity = ConnectivityService();
   ApiService apiService = ApiService();
@@ -47,17 +48,12 @@ class _BookingListPageState extends State<BookingListPage>
   List<Map<String, dynamic>> attach = [];
   late Map<String, dynamic> monitor;
   List<Asset> images = <Asset>[];
-  final String _error = 'No Error Dectected';
 
-  CameraController? _controller;
-  List<CameraDescription>? _cameras;
   final ImagePicker _picker = ImagePicker();
-  XFile? _imageFile;
-  final List<String> _imageList = [];
+  File? imageFile;
+  List<File>? selectedImages = [];
 
-  final int _currentPage = 1;
   int monitor_id = 0;
-  final int _totalPages = 1;
   bool _isLoading = true;
   bool isSaving = false;
   bool start = false;
@@ -73,52 +69,52 @@ class _BookingListPageState extends State<BookingListPage>
     _isLoading = true;
     bool isTab = _selectedTabIndex == 0;
     var task = "PICKUP";
-    final rows = await dbHelper.getAll('booking',
-        whereCondition: 'runsheet_id = ? AND task = ?',
-        whereArgs: [widget.item['runsheet_id'], task]);
+    final rows = await dbHelper.getAll('booking', whereCondition: 'runsheet_id = ? AND task = ?', whereArgs: [
+      widget.item['runsheet_id'],
+      task
+    ]);
     if (mounted) {
       setState(() {
         _pickup_items = rows.map((data) {
           int sequenceNo = data['sequence_no'] ?? 2;
-          String next_status = '';
-          int task_id;
-          String task_code = '';
-          int next_sequence_no;
+          String nextStatus = '';
+          int taskId;
+          String taskCode = '';
+          int nextSequenceNo;
           String status = data['status'] ?? 'Assigned';
           if (status == 'APA' || status == 'ARRIVE AT PICKUP ADDRESS') {
-            next_status = 'START LOADING';
-            task_id = 5;
-            task_code = 'STL';
-            next_sequence_no = sequenceNo + 1;
+            nextStatus = 'START LOADING';
+            taskId = 5;
+            taskCode = 'STL';
+            nextSequenceNo = sequenceNo + 1;
           } else if (status == 'STL' || status == 'START LOADING') {
-            next_status = 'FINISH LOADING';
-            task_id = 6;
-            task_code = 'FIL';
-            next_sequence_no = sequenceNo + 1;
+            nextStatus = 'FINISH LOADING';
+            taskId = 6;
+            taskCode = 'FIL';
+            nextSequenceNo = sequenceNo + 1;
           } else if (status == 'FIL' || status == 'FINISH LOADING') {
-            next_status = 'TIME DEPARTURE AT PICKUP ADDR';
-            task_id = 7;
-            task_code = 'TDP';
-            next_sequence_no = sequenceNo + 1;
-          } else if (status == 'TDP' ||
-              status == 'TIME DEPARTURE AT PICKUP ADDR') {
-            next_status = 'ARRIVE AT DELIVERY ADDRESS';
-            task_id = 8;
-            task_code = 'ADA';
-            next_sequence_no = sequenceNo + 1;
+            nextStatus = 'TIME DEPARTURE AT PICKUP ADDR';
+            taskId = 7;
+            taskCode = 'TDP';
+            nextSequenceNo = sequenceNo + 1;
+          } else if (status == 'TDP' || status == 'TIME DEPARTURE AT PICKUP ADDR') {
+            nextStatus = 'ARRIVE AT DELIVERY ADDRESS';
+            taskId = 8;
+            taskCode = 'ADA';
+            nextSequenceNo = sequenceNo + 1;
           } else {
-            next_status = 'ARRIVE AT PICKUP ADDRESS';
-            task_id = 4;
-            task_code = 'APA';
-            next_sequence_no = sequenceNo;
+            nextStatus = 'ARRIVE AT PICKUP ADDRESS';
+            taskId = 4;
+            taskCode = 'APA';
+            nextSequenceNo = sequenceNo;
           }
           return {
             ...data,
             'status': status,
-            'next_status': next_status,
-            'task_id': task_id,
-            'task_code': task_code,
-            'next_sequence_no': next_sequence_no
+            'next_status': nextStatus,
+            'task_id': taskId,
+            'task_code': taskCode,
+            'next_sequence_no': nextSequenceNo
           };
         }).toList();
       });
@@ -130,52 +126,52 @@ class _BookingListPageState extends State<BookingListPage>
   Future<List<dynamic>> delivery_booking() async {
     _isLoading = true;
     var task = "DELIVERY";
-    final rows = await dbHelper.getAll('booking',
-        whereCondition: 'runsheet_id = ? AND task = ?',
-        whereArgs: [widget.item['runsheet_id'], task]);
+    final rows = await dbHelper.getDelivery('booking', whereCondition: 'runsheet_id = ? AND task = ?', whereArgs: [
+      widget.item['runsheet_id'],
+      task
+    ]);
     if (mounted) {
       setState(() {
         _delivery_items = rows.map((data) {
           int sequenceNo = data['sequence_no'] ?? 6;
-          String next_status = '';
-          int task_id;
-          String task_code = '';
-          int next_sequence_no;
+          String nextStatus = '';
+          int taskId;
+          String taskCode = '';
+          int nextSequenceNo;
           String status = data['status'] ?? 'Assigned';
           if (status == 'ADA' || status == 'ARRIVE AT DELIVERY ADDRESS') {
-            next_status = 'START UNLOADING';
-            task_id = 9;
-            task_code = 'STU';
-            next_sequence_no = sequenceNo + 1;
+            nextStatus = 'START UNLOADING';
+            taskId = 9;
+            taskCode = 'STU';
+            nextSequenceNo = sequenceNo + 1;
           } else if (status == 'STU' || status == 'START UNLOADING') {
-            next_status = 'FINISH UNLOADING';
-            task_id = 10;
-            task_code = 'FIU';
-            next_sequence_no = sequenceNo + 1;
+            nextStatus = 'FINISH UNLOADING';
+            taskId = 10;
+            taskCode = 'FIU';
+            nextSequenceNo = sequenceNo + 1;
           } else if (status == 'FIU' || status == 'FINISH UNLOADING') {
-            next_status = 'TIME DEPARTURE AT DELIVERY ADDR';
-            task_id = 11;
-            task_code = 'TDD';
-            next_sequence_no = sequenceNo + 1;
-          } else if (status == 'TDD' ||
-              status == 'TIME DEPARTURE AT DELIVERY ADDR') {
-            next_status = 'APPROVED TIME OUT';
-            task_id = 12;
-            task_code = 'ATO';
-            next_sequence_no = sequenceNo + 1;
+            nextStatus = 'TIME DEPARTURE AT DELIVERY ADDR';
+            taskId = 11;
+            taskCode = 'TDD';
+            nextSequenceNo = sequenceNo + 1;
+          } else if (status == 'TDD' || status == 'TIME DEPARTURE AT DELIVERY ADDR') {
+            nextStatus = 'APPROVED TIME OUT';
+            taskId = 12;
+            taskCode = 'ATO';
+            nextSequenceNo = sequenceNo + 1;
           } else {
-            next_status = 'ARRIVE AT DELIVERY ADDRESS';
-            task_id = 8;
-            task_code = 'ADA';
-            next_sequence_no = sequenceNo;
+            nextStatus = 'ARRIVE AT DELIVERY ADDRESS';
+            taskId = 8;
+            taskCode = 'ADA';
+            nextSequenceNo = sequenceNo;
           }
           return {
             ...data,
             'status': status,
-            'next_status': next_status,
-            'task_id': task_id,
-            'task_code': task_code,
-            'next_sequence_no': next_sequence_no,
+            'next_status': nextStatus,
+            'task_id': taskId,
+            'task_code': taskCode,
+            'next_sequence_no': nextSequenceNo,
           };
         }).toList();
       });
@@ -186,8 +182,7 @@ class _BookingListPageState extends State<BookingListPage>
 
   Future<bool> checkInternetConnection() async {
     var connectivityResult = await (Connectivity().checkConnectivity());
-    if (connectivityResult == ConnectivityResult.mobile ||
-        connectivityResult == ConnectivityResult.wifi) {
+    if (connectivityResult == ConnectivityResult.mobile || connectivityResult == ConnectivityResult.wifi) {
       return true;
     } else {
       return false;
@@ -195,68 +190,63 @@ class _BookingListPageState extends State<BookingListPage>
   }
 
   Future<void> _getRecordById(int id) async {
-    bool _isConnected = await connectivity.isConnected();
-    if (!_isConnected) {
+    bool isConnected = await connectivity.isConnected();
+    if (!isConnected) {
       ConnectivityService.noInternetDialog(context);
     } else {
       if (widget.item['monitor_id'] == null) {
-        final responseData = await apiService.getRecordById("monitor", id);
-        if (responseData.statusCode == 200) {
-          monitor = json.decode(responseData.body);
-          setState(() {
-            if (monitor['data'].isNotEmpty) {
-              monitor_id = monitor['data']['id'];
-              final itm = {
-                'monitor_id': monitor_id,
-              };
-              dbHelper.update('runsheet', itm, id);
-              start = false;
-            } else {
-              start = true;
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (BuildContext dialogContext) {
-                  return AlertDialog(
-                    title: const Text('Start Runsheet'),
-                    content: TextField(
-                      keyboardType: TextInputType.text,
-                      controller: start_remarks,
-                      decoration: const InputDecoration(
-                        labelText: 'Remarks',
-                      ),
-                    ),
-                    actions: [
-                      TextButton(
-                        child: const Text(
-                          'CANCEL',
-                          style: TextStyle(color: Colors.red),
+        await apiService.getRecordById("monitor", id).then((res) {
+          if (res.statusCode == 200) {
+            monitor = json.decode(res.body);
+            setState(() {
+              if (monitor['data'].isNotEmpty) {
+                monitor_id = monitor['data']['id'];
+                final itm = {
+                  'monitor_id': monitor_id,
+                };
+                dbHelper.update('runsheet', itm, id);
+                start = false;
+              } else {
+                start = true;
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (BuildContext dialogContext) {
+                    return AlertDialog(
+                      title: const Text('Start Runsheet'),
+                      content: TextField(
+                        keyboardType: TextInputType.text,
+                        controller: start_remarks,
+                        decoration: const InputDecoration(
+                          labelText: 'Remarks',
                         ),
-                        onPressed: () {
-                          Navigator.pushAndRemoveUntil(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => const MainScreen()),
-                            (Route<dynamic> route) => false,
-                          );
-                        },
                       ),
-                      TextButton(
-                        child: const Text('START'),
-                        onPressed: () {
-                          startRunsheet();
-                          Navigator.of(context).pop();
-                        },
-                      ),
-                    ],
-                  );
-                },
-              );
-            }
-          });
-        } else {
-          throw Exception('Failed to retrieve record');
-        }
+                      actions: [
+                        TextButton(
+                          child: const Text(
+                            'CANCEL',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                        ),
+                        TextButton(
+                          child: const Text('START'),
+                          onPressed: () {
+                            startRunsheet();
+                          },
+                        ),
+                      ],
+                    );
+                  },
+                );
+              }
+            });
+          } else {
+            throw Exception('Failed to retrieve record');
+          }
+        });
       } else {
         monitor_id = widget.item['monitor_id'];
       }
@@ -278,8 +268,8 @@ class _BookingListPageState extends State<BookingListPage>
       'approved_time_in': '',
       'approved_time_out': ''
     };
-    bool _isConnected = await connectivity.isConnected();
-    if (!_isConnected) {
+    bool isConnected = await connectivity.isConnected();
+    if (!isConnected) {
       ConnectivityService.noInternetDialog(context);
     } else {
       try {
@@ -292,9 +282,7 @@ class _BookingListPageState extends State<BookingListPage>
           final itm = {
             'monitor_id': monitor_id,
           };
-          await dbHelper
-              .update('runsheet', itm, widget.item['runsheet_id'])
-              .then((_) {
+          await dbHelper.update('runsheet', itm, widget.item['runsheet_id']).then((_) {
             start = false;
             Navigator.of(context).pop();
             setState(() {
@@ -320,30 +308,12 @@ class _BookingListPageState extends State<BookingListPage>
     }
   }
 
-  Future<void> _openCamera(data) async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.camera);
-    final bytes = await image!.readAsBytes();
-    final base64Image = base64Encode(bytes);
-    final files = {
-      'source_id': data['source_id'] ?? '',
-      'task_id': data['task_id'] ?? '',
-      'attach': base64Image
-    };
-    setState(() {
-      attach.add(files);
-      attachment.add(base64Image);
-    });
-  }
-
   void _simulateLoading() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     final userdata = prefs.getString('user');
     if (userdata != "") {
       driver = json.decode(userdata!);
     }
-    setState(() {
-      _getRecordById(widget.item['runsheet_id']);
-    });
   }
 
   void _makePhoneCall(String phoneNumber) async {
@@ -366,6 +336,7 @@ class _BookingListPageState extends State<BookingListPage>
   @override
   void initState() {
     super.initState();
+    // Intl.defaultLocale = 'pt_BR';
     _simulateLoading();
     _getRecordById(widget.item['runsheet_id']);
     _tabController = TabController(length: 2, vsync: this);
@@ -378,15 +349,13 @@ class _BookingListPageState extends State<BookingListPage>
   Widget build(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      appBar: AppBar(title: Text(widget.item['reference'] ?? ''), actions: [
-        Builder(builder: (context) {
-          return IconButton(
-              icon: const Icon(Icons.sync), onPressed: pickup_booking);
-        })
-      ]),
+      appBar: AppBar(title: Text(widget.item['reference'] ?? '')),
       body: TabBarView(
         controller: _tabController,
-        children: [_buildPickupTab(), _buildDeliveryTab()],
+        children: [
+          _buildPickupTab(),
+          _buildDeliveryTab()
+        ],
       ),
       bottomNavigationBar: BottomAppBar(
         color: Colors.grey.shade900,
@@ -412,6 +381,51 @@ class _BookingListPageState extends State<BookingListPage>
           ],
         ),
       ),
+      floatingActionButton: Container(
+          margin: const EdgeInsets.only(bottom: 8.0),
+          child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, crossAxisAlignment: CrossAxisAlignment.end, children: [
+            (monitor_id == 0)
+                ? FloatingActionButton(
+                    backgroundColor: Colors.green,
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (BuildContext dialogContext) {
+                          return AlertDialog(
+                            title: const Text('Start Runsheet'),
+                            content: TextField(
+                              keyboardType: TextInputType.text,
+                              controller: start_remarks,
+                              decoration: const InputDecoration(
+                                labelText: 'Remarks',
+                              ),
+                            ),
+                            actions: [
+                              TextButton(
+                                child: const Text(
+                                  'CANCEL',
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                },
+                              ),
+                              TextButton(
+                                child: const Text('START'),
+                                onPressed: () {
+                                  startRunsheet();
+                                },
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    },
+                    child: const Text('START'))
+                : Container(),
+          ])),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
 
@@ -426,25 +440,17 @@ class _BookingListPageState extends State<BookingListPage>
                 controller: scrollController,
                 itemBuilder: (context, int index) {
                   final item = snapshot.data![index];
-                  DateTime est_pick =
-                      DateTime.parse(item['pickup_expected_date'] ?? '');
-                  final pickup_dtime =
-                      DateFormat('MMM d,yyyy h:mm a').format(est_pick);
-                  DateTime est_dlv =
-                      DateTime.parse(item['delivery_expected_date'] ?? '');
-                  final deliver_time =
-                      DateFormat('MMM d,yyyy h:mm a').format(est_dlv);
+                  DateTime estPick = DateTime.parse(item['pickup_expected_date'] ?? '');
+                  final pickupDtime = DateFormat('MMM d,yyyy h:mm a').format(estPick);
+                  DateTime estDlv = DateTime.parse(item['delivery_expected_date'] ?? '');
+                  final deliverTime = DateFormat('MMM d,yyyy h:mm a').format(estDlv);
                   return Padding(
                       padding: const EdgeInsets.all(4),
                       child: AbsorbPointer(
                         absorbing: false,
                         child: GestureDetector(
                           onTap: () {
-                            Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) =>
-                                        BookingDetailPage(item)));
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => BookingDetailPage(item)));
                           },
                           child: Card(
                             shadowColor: Colors.black,
@@ -453,208 +459,136 @@ class _BookingListPageState extends State<BookingListPage>
                               children: [
                                 Container(
                                     padding: EdgeInsets.zero,
-                                    child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.start,
-                                        children: [
-                                          ListTile(
-                                              title: Text(
-                                                item['reference'] ?? '',
-                                                style: TextStyle(
-                                                    color: Colors.red.shade900,
-                                                    fontSize: 16,
-                                                    fontWeight:
-                                                        FontWeight.bold),
-                                              ),
-                                              subtitle: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                mainAxisAlignment:
-                                                    MainAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    item['customer'] ?? '',
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      color: Colors.black,
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    "Status : " +
-                                                        (item['status'] ?? ''),
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      color: Colors.black,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              trailing: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  GestureDetector(
-                                                      onTap: () {
-                                                        Navigator.push(
-                                                            context,
-                                                            MaterialPageRoute(
-                                                                builder: (context) =>
-                                                                    Timeline(
-                                                                        _pickup_items[
-                                                                            index])));
-                                                      },
-                                                      child: const Icon(
-                                                        Icons.timeline,
-                                                        color: Colors.blue,
-                                                      )),
-                                                  const SizedBox(width: 10),
-                                                  GestureDetector(
-                                                      onTap: () {
-                                                        Navigator.push(
-                                                            context,
-                                                            MaterialPageRoute(
-                                                                builder:
-                                                                    (context) =>
-                                                                        const ExceptionPage()));
-                                                      },
-                                                      child: const Icon(
-                                                        Icons.info,
-                                                        color: Colors.red,
-                                                      )),
-                                                  const SizedBox(width: 10),
-                                                  GestureDetector(
-                                                      onTap: () {
-                                                        Navigator.push(
-                                                            context,
-                                                            MaterialPageRoute(
-                                                                builder:
-                                                                    (context) =>
-                                                                        const MapScreen()));
-                                                      },
-                                                      child: const Icon(
-                                                        Icons.map,
-                                                        color: Colors.green,
-                                                      )),
-                                                ],
-                                              )),
-                                          ListTile(
-                                              leading: const Icon(
-                                                Icons.place,
-                                                color: Colors.black87,
-                                              ),
-                                              title: const Text(
-                                                'Pick Up',
-                                                style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight:
-                                                        FontWeight.bold),
-                                              ),
-                                              trailing: Container(
-                                                margin: const EdgeInsets.only(
-                                                    left: 5),
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 8,
-                                                        vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.blue,
-                                                  borderRadius:
-                                                      BorderRadius.circular(20),
-                                                ),
-                                                child: Text(
-                                                  item['task'] ?? '',
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Colors.white,
-                                                  ),
+                                    child: Column(mainAxisAlignment: MainAxisAlignment.start, children: [
+                                      ListTile(
+                                          title: Text(
+                                            item['reference'] ?? '',
+                                            style: TextStyle(color: Colors.red.shade900, fontSize: 16, fontWeight: FontWeight.bold),
+                                          ),
+                                          subtitle: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            mainAxisAlignment: MainAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                item['customer'] ?? '',
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.black,
                                                 ),
                                               ),
-                                              subtitle: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      pickup_dtime,
-                                                      style: const TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          color: Colors.red,
-                                                          overflow: TextOverflow
-                                                              .ellipsis),
-                                                    ),
-                                                    Text(
-                                                      item['pickup_loc'] ?? '',
-                                                      style: const TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          overflow: TextOverflow
-                                                              .ellipsis),
-                                                    ),
-                                                    Text(
-                                                      item['pickup_other_address'] ??
-                                                          '',
-                                                      style: const TextStyle(
-                                                          fontSize: 11,
-                                                          overflow: TextOverflow
-                                                              .ellipsis),
-                                                    ),
-                                                  ])),
-                                          ListTile(
-                                              leading: const Icon(
-                                                Icons.pin_drop,
-                                                color: Colors.red,
+                                              Text(
+                                                "Status : " + (item['status'] ?? ''),
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.black,
+                                                ),
                                               ),
-                                              title: const Text(
-                                                'Delivery',
-                                                style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight:
-                                                        FontWeight.bold),
+                                            ],
+                                          ),
+                                          trailing: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              GestureDetector(
+                                                  onTap: () {
+                                                    Navigator.push(context, MaterialPageRoute(builder: (context) => Timeline(_pickup_items[index])));
+                                                  },
+                                                  child: const Icon(
+                                                    Icons.timeline,
+                                                    color: Colors.blue,
+                                                  )),
+                                              const SizedBox(width: 10),
+                                              GestureDetector(
+                                                  onTap: () {
+                                                    Navigator.push(context, MaterialPageRoute(builder: (context) => ExceptionPage(_pickup_items[index])));
+                                                  },
+                                                  child: const Icon(
+                                                    Icons.info,
+                                                    color: Colors.red,
+                                                  )),
+                                              const SizedBox(width: 10),
+                                              GestureDetector(
+                                                  onTap: () {
+                                                    Navigator.push(context, MaterialPageRoute(builder: (context) => MapScreen(_pickup_items[index])));
+                                                  },
+                                                  child: const Icon(
+                                                    Icons.map,
+                                                    color: Colors.green,
+                                                  )),
+                                            ],
+                                          )),
+                                      const Divider(color: Colors.black, thickness: 1.0),
+                                      ListTile(
+                                          leading: SvgPicture.asset(
+                                            'assets/icons/home_pin.svg',
+                                            width: 35.0,
+                                            height: 35.0,
+                                            color: Colors.blue,
+                                          ),
+                                          title: const Text(
+                                            'Pick Up',
+                                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                          ),
+                                          trailing: Container(
+                                            margin: const EdgeInsets.only(left: 5),
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: Colors.blue,
+                                              borderRadius: BorderRadius.circular(20),
+                                            ),
+                                            child: Text(
+                                              item['task'] ?? '',
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
                                               ),
-                                              subtitle: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      deliver_time,
-                                                      style: const TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          color: Colors.red,
-                                                          overflow: TextOverflow
-                                                              .ellipsis),
-                                                    ),
-                                                    Text(
-                                                      item['delivery_loc'] ??
-                                                          '',
-                                                      style: const TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          overflow: TextOverflow
-                                                              .ellipsis),
-                                                    ),
-                                                    Text(
-                                                      item['delivery_other_address'] ??
-                                                          '',
-                                                      style: const TextStyle(
-                                                          fontSize: 11,
-                                                          overflow: TextOverflow
-                                                              .ellipsis),
-                                                    ),
-                                                  ])),
-                                          ListTile(
+                                            ),
+                                          ),
+                                          subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                            Text(
+                                              pickupDtime,
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red, overflow: TextOverflow.ellipsis),
+                                            ),
+                                            Text(
+                                              item['pickup_loc'] ?? '',
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, overflow: TextOverflow.ellipsis),
+                                            ),
+                                            Text(
+                                              item['pickup_other_address'] ?? '',
+                                              style: const TextStyle(fontSize: 11, overflow: TextOverflow.ellipsis),
+                                            ),
+                                          ])),
+                                      ListTile(
+                                          leading: SvgPicture.asset(
+                                            'assets/icons/home_location.svg',
+                                            width: 35.0,
+                                            height: 35.0,
+                                            color: Colors.red,
+                                          ),
+                                          title: const Text(
+                                            'Delivery',
+                                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                          ),
+                                          subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                            Text(
+                                              deliverTime,
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red, overflow: TextOverflow.ellipsis),
+                                            ),
+                                            Text(
+                                              item['delivery_loc'] ?? '',
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, overflow: TextOverflow.ellipsis),
+                                            ),
+                                            Text(
+                                              item['delivery_other_address'] ?? '',
+                                              style: const TextStyle(fontSize: 11, overflow: TextOverflow.ellipsis),
+                                            ),
+                                          ])),
+                                      (monitor_id > 0)
+                                          ? ListTile(
                                               // leading: ElevatedButton(
                                               //   style: ElevatedButton.styleFrom(
                                               //       backgroundColor:
@@ -674,72 +608,43 @@ class _BookingListPageState extends State<BookingListPage>
                                               //   child: const Icon(Icons.call,
                                               //       color: Colors.white),
                                               // ),
-                                              title: (item['status'] == 'TDP' ||
-                                                      item['status'] ==
-                                                          'TIME DEPARTURE AT PICKUP ADDR')
+                                              title: (item['status'] == 'TDP' || item['status'] == 'TIME DEPARTURE AT PICKUP ADDR')
                                                   ? Container(
-                                                      margin:
-                                                          const EdgeInsets.only(
-                                                              left: 5),
-                                                      padding: const EdgeInsets
-                                                              .symmetric(
-                                                          horizontal: 8,
-                                                          vertical: 8),
+                                                      margin: const EdgeInsets.only(left: 5),
+                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                                                       decoration: BoxDecoration(
                                                         color: Colors.grey,
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(20),
+                                                        borderRadius: BorderRadius.circular(20),
                                                       ),
                                                       child: const Center(
                                                           child: Text(
                                                         'Pick-Up Successfully',
                                                         style: TextStyle(
                                                           fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.bold,
+                                                          fontWeight: FontWeight.bold,
                                                           color: Colors.white,
                                                         ),
                                                       )),
                                                     )
                                                   : ElevatedButton(
-                                                      style: ElevatedButton
-                                                          .styleFrom(
-                                                              backgroundColor:
-                                                                  Colors.blue
-                                                                      .shade700,
-                                                              minimumSize:
-                                                                  const Size
-                                                                          .fromHeight(
-                                                                      35),
-                                                              shape:
-                                                                  RoundedRectangleBorder(
-                                                                borderRadius:
-                                                                    BorderRadius
-                                                                        .circular(
-                                                                            20),
-                                                              )),
+                                                      style: ElevatedButton.styleFrom(
+                                                          backgroundColor: Colors.blue.shade700,
+                                                          minimumSize: const Size.fromHeight(35),
+                                                          shape: RoundedRectangleBorder(
+                                                            borderRadius: BorderRadius.circular(20),
+                                                          )),
                                                       child: FittedBox(
                                                         fit: BoxFit.scaleDown,
-                                                        child: Row(
-                                                            mainAxisSize:
-                                                                MainAxisSize
-                                                                    .max,
-                                                            children: [
-                                                              Text(item[
-                                                                      'next_status'] ??
-                                                                  ''),
-                                                              const SizedBox(
-                                                                  width: 8.0),
-                                                              // const Icon(
-                                                              //     Icons.east),
-                                                            ]),
+                                                        child: Row(mainAxisSize: MainAxisSize.max, children: [
+                                                          Text(item['next_status'] ?? ''),
+                                                          const SizedBox(width: 8.0),
+                                                        ]),
                                                       ),
                                                       onPressed: () {
-                                                        _showDialog(
-                                                            context, item);
-                                                      })),
-                                        ])),
+                                                        _showDialog(context, item);
+                                                      }))
+                                          : Container()
+                                    ])),
                               ],
                             ),
                           ),
@@ -749,7 +654,7 @@ class _BookingListPageState extends State<BookingListPage>
           } else {
             return Center(
               child: Lottie.asset(
-                "assets/animations/nodata.json",
+                "assets/animations/noitem.json",
                 animate: true,
                 alignment: Alignment.center,
                 height: 300,
@@ -761,9 +666,9 @@ class _BookingListPageState extends State<BookingListPage>
   }
 
   Widget _buildDeliveryTab() {
-    return FutureBuilder<List<dynamic>>(
+    return FutureBuilder(
         future: delivery_booking(),
-        builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
+        builder: (context, AsyncSnapshot snapshot) {
           if (snapshot.hasData) {
             return ListView.builder(
                 padding: const EdgeInsets.all(4),
@@ -771,25 +676,17 @@ class _BookingListPageState extends State<BookingListPage>
                 controller: scrollController,
                 itemBuilder: (context, int index) {
                   final item = snapshot.data![index];
-                  DateTime est_pick =
-                      DateTime.parse(item['pickup_expected_date'] ?? '');
-                  final pickup_dtime =
-                      DateFormat('MMM d,yyyy h:mm a').format(est_pick);
-                  DateTime est_dlv =
-                      DateTime.parse(item['delivery_expected_date'] ?? '');
-                  final deliver_time =
-                      DateFormat('MMM d,yyyy h:mm a').format(est_dlv);
+                  DateTime estPick = DateTime.parse(item['pickup_expected_date'] ?? '');
+                  final pickupDtime = DateFormat('MMM d,yyyy h:mm a').format(estPick);
+                  DateTime estDlv = DateTime.parse(item['delivery_expected_date'] ?? '');
+                  final deliverTime = DateFormat('MMM d,yyyy h:mm a').format(estDlv);
                   return Padding(
                       padding: const EdgeInsets.all(4),
                       child: AbsorbPointer(
                         absorbing: false,
                         child: GestureDetector(
                           onTap: () {
-                            Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => BookingDetailPage(
-                                        snapshot.data![index])));
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => BookingDetailPage(snapshot.data![index])));
                           },
                           child: Card(
                             shadowColor: Colors.black,
@@ -799,322 +696,177 @@ class _BookingListPageState extends State<BookingListPage>
                               children: [
                                 Container(
                                     padding: EdgeInsets.zero,
-                                    child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.start,
-                                        children: [
-                                          ListTile(
-                                              title: Text(
-                                                item['reference'] ?? '',
-                                                style: TextStyle(
-                                                    color: Colors.red.shade900,
-                                                    fontSize: 16,
-                                                    fontWeight:
-                                                        FontWeight.bold),
-                                              ),
-                                              subtitle: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                mainAxisAlignment:
-                                                    MainAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    item['customer'] ?? '',
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      color: Colors.black,
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    "Status : " +
-                                                        (item['status'] ?? ''),
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      color: Colors.black,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              trailing: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  GestureDetector(
-                                                      onTap: () {
-                                                        Navigator.push(
-                                                            context,
-                                                            MaterialPageRoute(
-                                                                builder: (context) =>
-                                                                    Timeline(
-                                                                        _delivery_items[
-                                                                            index])));
-                                                      },
-                                                      child: const Icon(
-                                                        Icons.timeline,
-                                                        color: Colors.blue,
-                                                      )),
-                                                  const SizedBox(width: 10),
-                                                  GestureDetector(
-                                                      onTap: () {
-                                                        Navigator.push(
-                                                            context,
-                                                            MaterialPageRoute(
-                                                                builder:
-                                                                    (context) =>
-                                                                        const ExceptionPage()));
-                                                      },
-                                                      child: const Icon(
-                                                        Icons.info,
-                                                        color: Colors.red,
-                                                      )),
-                                                  const SizedBox(width: 10),
-                                                  GestureDetector(
-                                                      onTap: () {
-                                                        Navigator.push(
-                                                            context,
-                                                            MaterialPageRoute(
-                                                                builder:
-                                                                    (context) =>
-                                                                        const MapScreen()));
-                                                      },
-                                                      child: const Icon(
-                                                        Icons.map,
-                                                        color: Colors.green,
-                                                      )),
-                                                ],
-                                              )),
-                                          const Divider(),
-                                          ListTile(
-                                              leading: const Icon(
-                                                Icons.place,
-                                                color: Colors.black87,
-                                              ),
-                                              title: const Text(
-                                                'Pick Up',
-                                                style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight:
-                                                        FontWeight.bold),
-                                              ),
-                                              trailing: Container(
-                                                margin: const EdgeInsets.only(
-                                                    left: 5),
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 8,
-                                                        vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.green,
-                                                  borderRadius:
-                                                      BorderRadius.circular(20),
-                                                ),
-                                                child: Text(
-                                                  item['task'] ?? '',
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Colors.white,
-                                                  ),
+                                    child: Column(mainAxisAlignment: MainAxisAlignment.start, children: [
+                                      ListTile(
+                                          title: Text(
+                                            item['reference'] ?? '',
+                                            style: TextStyle(color: Colors.red.shade900, fontSize: 16, fontWeight: FontWeight.bold),
+                                          ),
+                                          subtitle: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            mainAxisAlignment: MainAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                item['customer'] ?? '',
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.black,
                                                 ),
                                               ),
-                                              subtitle: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      pickup_dtime,
-                                                      style: const TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          color: Colors.red,
-                                                          overflow: TextOverflow
-                                                              .ellipsis),
-                                                    ),
-                                                    Text(
-                                                      item['pickup_loc'] ?? '',
-                                                      style: const TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          overflow: TextOverflow
-                                                              .ellipsis),
-                                                    ),
-                                                    Text(
-                                                      item['pickup_other_address'] ??
-                                                          '',
-                                                      style: const TextStyle(
-                                                          fontSize: 11,
-                                                          overflow: TextOverflow
-                                                              .ellipsis),
-                                                    ),
-                                                  ])),
-                                          ListTile(
-                                              leading: const Icon(
-                                                Icons.pin_drop,
-                                                color: Colors.red,
+                                              Text(
+                                                "Status : " + (item['status'] ?? ''),
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.black,
+                                                ),
                                               ),
-                                              title: const Text(
-                                                'Delivery',
-                                                style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight:
-                                                        FontWeight.bold),
+                                            ],
+                                          ),
+                                          trailing: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              GestureDetector(
+                                                  onTap: () {
+                                                    Navigator.push(context, MaterialPageRoute(builder: (context) => Timeline(_delivery_items[index])));
+                                                  },
+                                                  child: const Icon(
+                                                    Icons.timeline,
+                                                    color: Colors.blue,
+                                                  )),
+                                              const SizedBox(width: 10),
+                                              GestureDetector(
+                                                  onTap: () {
+                                                    Navigator.push(context, MaterialPageRoute(builder: (context) => ExceptionPage(_delivery_items[index])));
+                                                  },
+                                                  child: const Icon(
+                                                    Icons.info,
+                                                    color: Colors.red,
+                                                  )),
+                                              const SizedBox(width: 10),
+                                              GestureDetector(
+                                                  onTap: () {
+                                                    Navigator.push(context, MaterialPageRoute(builder: (context) => MapScreen(item)));
+                                                  },
+                                                  child: const Icon(
+                                                    Icons.map,
+                                                    color: Colors.green,
+                                                  )),
+                                            ],
+                                          )),
+                                      const Divider(color: Colors.black, thickness: 1.0),
+                                      ListTile(
+                                          leading: SvgPicture.asset(
+                                            'assets/icons/home_pin.svg',
+                                            width: 35.0,
+                                            height: 35.0,
+                                            color: Colors.blue,
+                                          ),
+                                          title: const Text(
+                                            'Pick Up',
+                                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                          ),
+                                          trailing: Container(
+                                            margin: const EdgeInsets.only(left: 5),
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: Colors.green,
+                                              borderRadius: BorderRadius.circular(20),
+                                            ),
+                                            child: Text(
+                                              item['task'] ?? '',
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
                                               ),
-                                              subtitle: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      deliver_time,
-                                                      style: const TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          color: Colors.red,
-                                                          overflow: TextOverflow
-                                                              .ellipsis),
-                                                    ),
-                                                    Text(
-                                                      item['delivery_loc'] ??
-                                                          '',
-                                                      style: const TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          overflow: TextOverflow
-                                                              .ellipsis),
-                                                    ),
-                                                    Text(
-                                                      item['delivery_other_address'] ??
-                                                          '',
-                                                      style: const TextStyle(
-                                                          fontSize: 11,
-                                                          overflow: TextOverflow
-                                                              .ellipsis),
-                                                    ),
-                                                  ])),
-                                          ListTile(
-                                              // leading: ElevatedButton(
-                                              //   style: ElevatedButton.styleFrom(
-                                              //       backgroundColor:
-                                              //           Colors.red.shade700,
-                                              //       shape:
-                                              //           RoundedRectangleBorder(
-                                              //         borderRadius:
-                                              //             BorderRadius.circular(
-                                              //                 20),
-                                              //       )),
-                                              //   onPressed: () {
-                                              //     _makePhoneCall('09353330652');
-                                              //   },
-                                              //   child: const Icon(Icons.call,
-                                              //       color: Colors.white),
-                                              // ),
-                                              title: (item['status'] == 'TDD' ||
-                                                      item['status'] ==
-                                                          'TIME DEPARTURE AT DELIVERY ADDR')
+                                            ),
+                                          ),
+                                          subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                            Text(
+                                              pickupDtime,
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red, overflow: TextOverflow.ellipsis),
+                                            ),
+                                            Text(
+                                              item['pickup_loc'] ?? '',
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, overflow: TextOverflow.ellipsis),
+                                            ),
+                                            Text(
+                                              item['pickup_other_address'] ?? '',
+                                              style: const TextStyle(fontSize: 11, overflow: TextOverflow.ellipsis),
+                                            ),
+                                          ])),
+                                      ListTile(
+                                          leading: SvgPicture.asset(
+                                            'assets/icons/home_location.svg',
+                                            width: 35.0,
+                                            height: 35.0,
+                                            color: Colors.red,
+                                          ),
+                                          title: const Text(
+                                            'Delivery',
+                                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                          ),
+                                          subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                            Text(
+                                              deliverTime,
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red, overflow: TextOverflow.ellipsis),
+                                            ),
+                                            Text(
+                                              item['delivery_loc'] ?? '',
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, overflow: TextOverflow.ellipsis),
+                                            ),
+                                            Text(
+                                              item['delivery_other_address'] ?? '',
+                                              style: const TextStyle(fontSize: 11, overflow: TextOverflow.ellipsis),
+                                            ),
+                                          ])),
+                                      (monitor_id > 0 && item['pick_stat'] == 'TDP')
+                                          ? ListTile(
+                                              title: (item['status'] == 'TDD' || item['status'] == 'TIME DEPARTURE AT DELIVERY ADDR')
                                                   ? Container(
-                                                      margin:
-                                                          const EdgeInsets.only(
-                                                              left: 5),
-                                                      padding: const EdgeInsets
-                                                              .symmetric(
-                                                          horizontal: 8,
-                                                          vertical: 8),
+                                                      margin: const EdgeInsets.only(left: 5),
+                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                                                       decoration: BoxDecoration(
                                                         color: Colors.grey,
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(20),
+                                                        borderRadius: BorderRadius.circular(20),
                                                       ),
                                                       child: const Center(
                                                           child: Text(
                                                         'Delivered Successfully',
                                                         style: TextStyle(
                                                           fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.bold,
+                                                          fontWeight: FontWeight.bold,
                                                           color: Colors.white,
                                                         ),
                                                       )),
                                                     )
                                                   : ElevatedButton(
-                                                      style: ElevatedButton
-                                                          .styleFrom(
-                                                              backgroundColor:
-                                                                  Colors.green
-                                                                      .shade700,
-                                                              minimumSize:
-                                                                  const Size
-                                                                          .fromHeight(
-                                                                      35),
-                                                              shape:
-                                                                  RoundedRectangleBorder(
-                                                                borderRadius:
-                                                                    BorderRadius
-                                                                        .circular(
-                                                                            20),
-                                                              )),
+                                                      style: ElevatedButton.styleFrom(
+                                                          backgroundColor: Colors.green.shade700,
+                                                          minimumSize: const Size.fromHeight(35),
+                                                          shape: RoundedRectangleBorder(
+                                                            borderRadius: BorderRadius.circular(20),
+                                                          )),
                                                       child: FittedBox(
                                                         fit: BoxFit.scaleDown,
-                                                        child: Row(
-                                                            mainAxisSize:
-                                                                MainAxisSize
-                                                                    .max,
-                                                            children: [
-                                                              Text(item[
-                                                                      'next_status'] ??
-                                                                  ''),
-                                                              const SizedBox(
-                                                                  width: 8.0),
-                                                              // const Icon(
-                                                              //     Icons.east),
-                                                            ]),
+                                                        child: Row(mainAxisSize: MainAxisSize.max, children: [
+                                                          Text(item['next_status'] ?? ''),
+                                                          const SizedBox(width: 8.0),
+                                                          // const Icon(
+                                                          //     Icons.east),
+                                                        ]),
                                                       ),
                                                       onPressed: () async {
-                                                        final rows =
-                                                            await dbHelper.getAll(
-                                                                'booking',
-                                                                whereCondition:
-                                                                    'source_id = ? AND task = ? AND reference = ?',
-                                                                whereArgs: [
-                                                                  item[
-                                                                      'source_id'],
-                                                                  'PICKUP',
-                                                                  item[
-                                                                      'reference']
-                                                                ],
-                                                                orderBy:
-                                                                    'sequence_no DESC');
-
                                                         setState(() {
-                                                          if (rows.isNotEmpty) {
-                                                            final stat = rows[0]
-                                                                ['status'];
-                                                            if (stat != 'TDP') {
-                                                              errorDialog(
-                                                                  context,
-                                                                  item);
-                                                            } else {
-                                                              _showDialog(
-                                                                  context,
-                                                                  item);
-                                                            }
-                                                          } else {
-                                                            _showDialog(
-                                                                context, item);
-                                                          }
+                                                          _showDialog(context, item);
                                                         });
-                                                      })),
-                                        ]))
+                                                      }))
+                                          : Container()
+                                    ]))
                               ],
                             ),
                           ),
@@ -1135,243 +887,278 @@ class _BookingListPageState extends State<BookingListPage>
         });
   }
 
-  Future<List> loadAssets(data) async {
-    List<Asset> resultList = <Asset>[];
-    String error = 'No Error Detected';
-
-    try {
-      resultList = await MultiImagePicker.pickImages(
-        maxImages: 3,
-        enableCamera: true,
-        selectedAssets: images,
-        cupertinoOptions: const CupertinoOptions(takePhotoIcon: "chat"),
-        materialOptions: const MaterialOptions(
-          actionBarColor: "#FF4136",
-          actionBarTitle: "Attachment",
-          allViewTitle: "All Photos",
-          useDetailsView: false,
-          selectCircleStrokeColor: "#000000",
-        ),
-      );
-    } on Exception catch (e) {
-      error = e.toString();
-    }
-    if (!mounted) return [];
-    setState(() {
-      images = resultList;
-    });
-
-    for (var i = 0; i < images.length; i++) {
-      ByteData byteData = await images[i].getByteData();
-      List<int> imageData = byteData.buffer.asUint8List();
-      String base64Image = base64Encode(imageData);
-      final attachs = {
-        'source_id': data['source_id'] ?? '',
-        'task_id': data['task_id'] ?? '',
-        'attach': base64Image
-      };
-      setState(() {
-        attach.add(attachs);
-        attachment.add(base64Image);
+  FormGroup buildForm() => fb.group({
+        'dateTime': FormControl<DateTime>(value: DateTime.now(), validators: [
+          Validators.required
+        ])
       });
+  String? customValidator(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'This field cannot be empty.';
     }
-    return images;
+    return null;
   }
 
-  Future<void> _showDialog(BuildContext context, data) async {
+  _showDialog(BuildContext context, data) async {
     final TextEditingController note = TextEditingController();
-    final TextEditingController receive_by = TextEditingController();
-    String? _errorMessage;
-    attachment = [];
+    final TextEditingController receiveBy = TextEditingController();
+
+    DateTime datetime = DateTime.now();
+    selectedImages = [];
+    attach = [];
     showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-            child: SingleChildScrollView(
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              const SizedBox(height: 8.0),
-              Container(
-                  child: Column(
-                children: [
-                  Text(data['reference'] ?? '',
-                      style: TextStyle(
-                          color: Colors.red,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16)),
-                  Text(
-                    "${"Please confirm status change to \n" + (data['next_status'] ?? '')}.",
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ],
-              )),
-              (data['task'] == 'DELIVERY' && data['task_code'] == 'FIU')
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                          const SizedBox(height: 8.0),
-                          const Text('Add Signature',
-                              textAlign: TextAlign.start),
-                          const SizedBox(height: 8.0),
-                          Container(
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: Colors.grey,
-                                width: 1.0,
-                              ),
-                            ),
-                            height: 100.0,
-                            child: Signature(
-                              key: _signatureKey,
-                              color: Colors.black,
-                              strokeWidth: 2.0,
-                            ),
-                          ),
-                          const SizedBox(height: 8.0),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              TextButton(
-                                  child: const Text(
-                                    'Clear Signature',
-                                    style: TextStyle(color: Colors.red),
-                                  ),
-                                  onPressed: () {
-                                    _signatureKey.currentState!.clear();
-                                  }),
-                            ],
-                          ),
-                          // const SizedBox(height: 8.0),
-                          // const Text('Add Attachment:',
-                          //     textAlign: TextAlign.start),
-                          // const SizedBox(height: 8.0),
-                          // Row(
-                          //     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          //     children: [
-                          //       TextButton.icon(
-                          //           icon: const Icon(Icons.attach_file,
-                          //               color: Colors.grey),
-                          //           label: const Text('Attach',
-                          //               style: TextStyle(color: Colors.black)),
-                          //           onPressed: () {
-                          //             loadAssets(data);
-                          //           }),
-                          //       TextButton.icon(
-                          //         onPressed: () {
-                          //           _openCamera(data);
-                          //         },
-                          //         icon: const Icon(Icons.camera_alt,
-                          //             color: Colors.grey),
-                          //         label: const Text('Camera',
-                          //             style: TextStyle(color: Colors.black)),
-                          //       ),
-                          //     ]),
-                          // const SizedBox(height: 8.0),
-                          // attachment.isNotEmpty
-                          //     ? Container(
-                          //         decoration: BoxDecoration(
-                          //           border: Border.all(
-                          //             color: Colors.grey,
-                          //             width: 1.0,
-                          //           ),
-                          //         ),
-                          //         height: 100,
-                          //         child: GridView.builder(
-                          //           gridDelegate:
-                          //               const SliverGridDelegateWithFixedCrossAxisCount(
-                          //             crossAxisCount: 3,
-                          //             mainAxisSpacing: 8,
-                          //             crossAxisSpacing: 8,
-                          //             childAspectRatio: 1,
-                          //           ),
-                          //           itemCount: attachment.length,
-                          //           itemBuilder: (context, index) {
-                          //             return Stack(
-                          //               children: [
-                          //                 Image.memory(
-                          //                   base64Decode(attachment[index]),
-                          //                   width: 300,
-                          //                   height: 300,
-                          //                   alignment: Alignment.center,
-                          //                 ),
-                          //                 Positioned(
-                          //                   top: 0,
-                          //                   right: 0,
-                          //                   child: Checkbox(
-                          //                     value:
-                          //                         true, // Check the box automatically
-                          //                     onChanged: (bool? value) {
-                          //                       setState(() {
-                          //                         if (value == false) {
-                          //                           attachment.removeAt(index);
-                          //                         }
-                          //                       });
-                          //                     },
-                          //                   ),
-                          //                 ),
-                          //               ],
-                          //             );
-                          //           },
-                          //         ),
-                          //       )
-                          //     : const Text(''),
-                          const SizedBox(height: 8.0),
-                          SizedBox(
-                              height: 40.0,
-                              child: TextField(
-                                controller: receive_by,
-                                keyboardType: TextInputType.text,
-                                decoration: InputDecoration(
-                                    border: OutlineInputBorder(),
-                                    labelText: 'Received By',
-                                    errorText: _errorMessage),
-                              )),
-                        ])
-                  : Container(),
-              const SizedBox(height: 16.0),
-              TextField(
-                controller: note,
-                decoration: const InputDecoration(
-                    labelText: 'Remarks', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 16.0),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  TextButton(
-                      child: const Text('CANCEL',
-                          style: TextStyle(color: Colors.red)),
-                      onPressed: () {
-                        setState(() {
-                          Navigator.of(context).pop();
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return Dialog(
+              child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(8),
+                  child: StatefulBuilder(builder: (BuildContext context, StateSetter setState) {
+                    return ReactiveFormBuilder(
+                        form: buildForm,
+                        builder: (context, form, child) {
+                          final datetime = form.control('dateTime');
+                          return Form(
+                              key: _formKey,
+                              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: <Widget>[
+                                const SizedBox(height: 8.0),
+                                Container(
+                                    child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    Align(
+                                      alignment: Alignment.center,
+                                      child: Text(data['reference'] ?? '', textAlign: TextAlign.center, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16)),
+                                    ),
+                                    const Divider(),
+                                    const Text(
+                                      "Please confirm status change to",
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(height: 4.0),
+                                    Text(
+                                      data['next_status'] ?? '',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade900),
+                                    ),
+                                  ],
+                                )),
+                                const SizedBox(height: 16.0),
+                                ReactiveDateTimePicker(
+                                    formControlName: 'dateTime',
+                                    type: ReactiveDatePickerFieldType.dateTime,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Date & Time',
+                                      hintText: 'hintText',
+                                      border: OutlineInputBorder(),
+                                      suffixIcon: Icon(Icons.calendar_today),
+                                    ),
+                                    selectableDayPredicate: (DateTime date) {
+                                      final currentDate = DateTime.now();
+                                      final twoDaysBefore = currentDate.subtract(const Duration(days: 2));
+                                      return date.isAfter(twoDaysBefore) || date.isAtSameMomentAs(currentDate);
+                                    }),
+                                const SizedBox(height: 4.0),
+                                (data['task'] == 'DELIVERY' && data['task_code'] == 'TDD')
+                                    ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                        const SizedBox(height: 8.0),
+                                        const Text('Add Signature', textAlign: TextAlign.start),
+                                        const SizedBox(height: 8.0),
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            border: Border.all(
+                                              color: Colors.grey,
+                                              width: 1.0,
+                                            ),
+                                          ),
+                                          height: 100.0,
+                                          child: Signature(
+                                            key: _signatureKey,
+                                            color: Colors.black,
+                                            strokeWidth: 2.0,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2.0),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                          children: [
+                                            TextButton(
+                                                child: const Text(
+                                                  'Clear Signature',
+                                                  style: TextStyle(color: Colors.red),
+                                                ),
+                                                onPressed: () {
+                                                  _signatureKey.currentState!.clear();
+                                                }),
+                                          ],
+                                        ),
+                                        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                                          const Text('Add Attachment:', textAlign: TextAlign.start),
+                                          // const SizedBox(width: 70.0),
+                                          IconButton(
+                                              icon: SvgPicture.asset(
+                                                'assets/icons/gallery_thumbnail.svg',
+                                                width: 35.0,
+                                                height: 35.0,
+                                                color: Colors.green.shade900,
+                                              ),
+                                              onPressed: () async {
+                                                final image = await _picker.pickImage(source: ImageSource.gallery);
+                                                if (image != null) {
+                                                  final directory = await getApplicationDocumentsDirectory();
+                                                  String imagePath = image.path;
+                                                  String filename = path.basename(imagePath);
+                                                  final tempPath = path.join(directory.path, filename);
+                                                  final imageFile = File(image.path);
+                                                  await imageFile.copy(tempPath);
+
+                                                  final files = {
+                                                    'source_id': data['source_id'] ?? '',
+                                                    'task_id': data['task_id'] ?? '',
+                                                    'attach': filename
+                                                  };
+                                                  setState(() {
+                                                    attach.add(files);
+                                                    selectedImages!.add(File(imagePath));
+                                                  });
+                                                }
+                                              }),
+                                          IconButton(
+                                              onPressed: () async {
+                                                final image = await _picker.pickImage(source: ImageSource.camera);
+                                                if (image != null) {
+                                                  final directory = await getApplicationDocumentsDirectory();
+                                                  var imagePath = File(image.path);
+                                                  String filename = path.basename(image.path);
+                                                  final tempPath = path.join(directory.path, filename);
+                                                  await imagePath.copy(tempPath);
+                                                  final files = {
+                                                    'source_id': data['source_id'] ?? '',
+                                                    'task_id': data['task_id'] ?? '',
+                                                    'attach': filename
+                                                  };
+                                                  setState(() {
+                                                    attach.add(files);
+                                                    selectedImages!.add(imagePath);
+                                                  });
+                                                }
+                                              },
+                                              icon: Icon(Icons.camera_alt, color: Colors.red.shade900),
+                                              iconSize: 28.0),
+                                        ]),
+                                        const SizedBox(height: 8.0),
+                                        selectedImages!.isNotEmpty
+                                            ? SizedBox(
+                                                height: 100,
+                                                child: GridView.builder(
+                                                  shrinkWrap: true,
+                                                  physics: const NeverScrollableScrollPhysics(),
+                                                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                                    crossAxisCount: 3,
+                                                    mainAxisSpacing: 8,
+                                                    crossAxisSpacing: 8,
+                                                    childAspectRatio: 1,
+                                                  ),
+                                                  itemCount: selectedImages!.length,
+                                                  itemBuilder: (context, index) {
+                                                    return Stack(
+                                                      children: [
+                                                        Image.file(selectedImages![index], fit: BoxFit.cover, width: 300, height: 300, alignment: Alignment.center),
+                                                        Positioned(
+                                                          top: 0,
+                                                          right: 0,
+                                                          child: Checkbox(
+                                                            value: true,
+                                                            onChanged: (bool? value) {
+                                                              setState(() {
+                                                                if (value == false) {
+                                                                  selectedImages!.removeAt(index);
+                                                                }
+                                                              });
+                                                            },
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    );
+                                                  },
+                                                ),
+                                              )
+                                            : const Align(
+                                                alignment: Alignment.center,
+                                                child: Text(
+                                                  '',
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(color: Colors.red),
+                                                )),
+                                        const SizedBox(height: 8.0),
+                                        TextFormField(
+                                          controller: receiveBy,
+                                          validator: customValidator,
+                                          keyboardType: TextInputType.text,
+                                          decoration: InputDecoration(
+                                            border: const OutlineInputBorder(),
+                                            labelText: 'Received By',
+                                            suffixIcon: receiveBy.text != ''
+                                                ? IconButton(
+                                                    icon: const Icon(Icons.clear),
+                                                    onPressed: () {
+                                                      receiveBy.clear();
+                                                    },
+                                                  )
+                                                : null,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8.0),
+                                        TextFormField(
+                                          controller: note,
+                                          validator: customValidator,
+                                          decoration: const InputDecoration(labelText: 'Remarks', border: OutlineInputBorder()),
+                                        ),
+                                        const SizedBox(height: 16.0)
+                                      ])
+                                    : Container(),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    FilledButton.icon(
+                                        icon: const Icon(Icons.close),
+                                        style: ButtonStyle(
+                                          backgroundColor: MaterialStateProperty.all<Color>(Colors.orange.shade300),
+                                        ),
+                                        label: const Text('CANCEL', style: TextStyle(color: Colors.white)),
+                                        onPressed: () {
+                                          setState(() {
+                                            Navigator.of(context).pop();
+                                          });
+                                        }),
+                                    const SizedBox(
+                                      width: 2,
+                                    ),
+                                    FilledButton.icon(
+                                      icon: const Icon(Icons.save),
+                                      style: ButtonStyle(
+                                        backgroundColor: MaterialStateProperty.all<Color>(Colors.red.shade900),
+                                      ),
+                                      label: const Text('SAVE', overflow: TextOverflow.ellipsis),
+                                      onPressed: () {
+                                        if (_formKey.currentState!.validate() && form.valid) {
+                                          final DateTime date = datetime.value;
+                                          final DateFormat dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
+                                          data['note'] = note.text;
+                                          data['receive_by'] = receiveBy.text;
+                                          data['datetime'] = dateFormat.format(date);
+                                          updateStatus(data);
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ]));
                         });
-                      }),
-                  const SizedBox(
-                    width: 2,
-                  ),
-                  FilledButton(
-                    style: ButtonStyle(
-                      backgroundColor:
-                          MaterialStateProperty.all<Color>(Colors.green),
-                    ),
-                    child:
-                        const Text('SUBMIT', overflow: TextOverflow.ellipsis),
-                    onPressed: () {
-                      data['note'] = note.text;
-                      data['receive_by'] = receive_by.text;
-                      updateStatus(data);
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ));
-      },
-    );
+                  })));
+        });
   }
 
   Future<void> errorDialog(BuildContext context, data) {
@@ -1380,8 +1167,7 @@ class _BookingListPageState extends State<BookingListPage>
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Warning!', style: TextStyle(color: Colors.red)),
-          content: Text(
-              "Booking ${data['reference'] ?? ''} is not yet PICK-UP, Unable to change status."),
+          content: Text("Booking ${data['reference'] ?? ''} is not yet PICK-UP, Unable to change status."),
           actions: [
             TextButton(
               child: const Text('OK'),
@@ -1403,15 +1189,23 @@ class _BookingListPageState extends State<BookingListPage>
     final sign = _signatureKey.currentState;
     if (sign != null) {
       final image = await sign.getData();
-      var bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-      final signature = base64.encode(bytes!.buffer.asUint8List());
-      String mimeType = 'application/png';
-      var signed = 'data:$mimeType;base64,$signature';
+      final imageBytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      final directory = await getApplicationDocumentsDirectory();
+      final dateTimex = DateTime.now();
+      final filename = '${dateTimex.microsecondsSinceEpoch}.png';
+      final imagePath = path.join(directory.path, filename);
+      final buffer = imageBytes!.buffer;
+      final file = await File(imagePath).writeAsBytes(buffer.asUint8List(imageBytes.offsetInBytes, imageBytes.lengthInBytes));
+
+      final tempDirectory = await getTemporaryDirectory();
+      final tempPath = path.join(tempDirectory.path, filename);
+      await file.copy(tempPath);
+
       setState(() {
         final files = {
           'source_id': data['source_id'] ?? '',
           'task_id': data['task_id'] ?? '',
-          'attach': signed
+          'attach': filename
         };
         attach.add(files);
       });
@@ -1426,15 +1220,12 @@ class _BookingListPageState extends State<BookingListPage>
       'task_type': data['task'] ?? '',
       'task_code': data['task_code'] ?? '',
       'contact_person': data['receive_by'] ?? '',
-      'datetime': dateTime,
+      'datetime': data['datetime'] ?? dateTime,
       'task_exception': data['task_exception'] ?? '',
       'line_id': data['line_id'] ?? '',
-      'location': data['location'] ?? '',
       'source_id': data['source_id'] ?? '',
       'task_id': data['task_id'] ?? '',
       'note': data['note'] ?? '',
-      // 'attachment': jsonEncode(attachment),
-      // 'signature': signature,
       'monitor_id': monitor_id,
       'flag': 0
     };

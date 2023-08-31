@@ -11,7 +11,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:drive/connectivity_service.dart';
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({Key? key}) : super(key: key);
+  final info;
+  const MapScreen(this.info, {Key? key}) : super(key: key);
 
   @override
   _MapScreenState createState() => _MapScreenState();
@@ -21,9 +22,8 @@ class _MapScreenState extends State<MapScreen> {
   late GoogleMapController mapController;
   ConnectivityService connectivity = ConnectivityService();
   final directions = direct.GoogleMapsDirections(apiKey: dotenv.env['API_KEY']);
-  final LatLng _pickupLocation = const LatLng(14.4377343, 121.003499);
-  final LatLng _deliveryLocation = const LatLng(14.481283, 121.005050);
-
+  late LatLng _pickupLocation;
+  late LatLng _deliveryLocation;
   final Set<Polyline> _polylines = {};
   final Set<Marker> _markers = {};
   LatLng? _currentLocation;
@@ -31,7 +31,7 @@ class _MapScreenState extends State<MapScreen> {
   double distanceInMeters = 0;
   String duration = "";
 
-  final LatLng _center = const LatLng(14.440966, 121.003250);
+  late LatLng _center = const LatLng(14.440966, 121.003250);
 
   late BitmapDescriptor _pickUpIcon;
   late BitmapDescriptor _deliveryIcon;
@@ -42,8 +42,8 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _getEstimatedTime() async {
     final response = await directions.directionsWithAddress(
-      'Philippine Merchant Marine School, Las Piñas, 1747 Metro Manila',
-      'F2X4+QJQ AAI Freight Management Center, Kaingin Rd, Parañaque, 1709 Metro Manila',
+      widget.info['pickup_other_address'],
+      widget.info['delivery_other_address'],
     );
 
     if (response.isOkay) {
@@ -75,20 +75,75 @@ class _MapScreenState extends State<MapScreen> {
     return distanceInMeters;
   }
 
+  void getAddressCoordinates() async {
+    final pickupOtherAddress = widget.info['pickup_other_address'];
+    final pickup = await getCoordinatesFromAddress(pickupOtherAddress);
+
+    final deliveryOtherAddress = widget.info['delivery_other_address'];
+    final delivery = await getCoordinatesFromAddress(deliveryOtherAddress);
+
+    _pickupLocation =
+        LatLng(pickup['latitude'] as double, pickup['longitude'] as double);
+    _deliveryLocation =
+        LatLng(delivery['latitude'] as double, delivery['longitude'] as double);
+    setState(() {
+      _getDirections();
+      _calculateDistance();
+      _getEstimatedTime();
+      calculateCenter();
+    });
+  }
+
+  void calculateCenter() {
+    double lat1 = _pickupLocation.latitude;
+    double lon1 = _pickupLocation.longitude;
+    double lat2 = _deliveryLocation.latitude;
+    double lon2 = _deliveryLocation.longitude;
+
+    double centerLat = (lat1 + lat2) / 2;
+    double centerLon = (lon1 + lon2) / 2;
+
+    _center = LatLng(centerLat, centerLon);
+  }
+
+  Future<Map<String, double>> getCoordinatesFromAddress(String address) async {
+    final apiKey = dotenv.env['API_KEY'];
+    final encodedAddress = Uri.encodeComponent(address);
+    final url =
+        'https://maps.googleapis.com/maps/api/geocode/json?address=$encodedAddress&key=$apiKey';
+
+    final response = await http.get(Uri.parse(url));
+
+    if (response.statusCode == 200) {
+      final decodedData = json.decode(response.body);
+
+      if (decodedData['status'] == 'OK') {
+        final location = decodedData['results'][0]['geometry']['location'];
+
+        final latitude = location['lat'] as double;
+        final longitude = location['lng'] as double;
+
+        return {'latitude': latitude, 'longitude': longitude};
+      } else {
+        throw Exception('Geocoding API request failed');
+      }
+    } else {
+      throw Exception('Failed to load data from Geocoding API');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _initConnectivity();
     _getCurrentLocation();
-    _calculateDistance();
-    _getEstimatedTime();
+    getAddressCoordinates();
     _resizeMarkerIcon();
-    _getDirections();
   }
 
   void _initConnectivity() async {
-    bool _isConnected = await connectivity.isConnected();
-    if (!_isConnected) {
+    bool isConnected = await connectivity.isConnected();
+    if (!isConnected) {
       ConnectivityService.noInternetDialog(context);
     }
   }
@@ -133,15 +188,14 @@ class _MapScreenState extends State<MapScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          content: Row(
-            children: [
-              Expanded(
-                  child: Text(
-                      'Estimated Distance: ${(_calculateDistance() / 1000).toStringAsFixed(2)} km')),
-              const SizedBox(height: 10.0),
-              Expanded(child: Text('Estimated Time: $duration')),
-            ],
-          ),
+          content: Container(
+              constraints: const BoxConstraints(maxHeight: 100.0),
+              child: Column(children: [
+                Text(
+                    'Estimated Distance: ${(_calculateDistance() / 1000).toStringAsFixed(2)} km'),
+                const SizedBox(height: 5.0),
+                Text('Estimated Time: $duration'),
+              ])),
           actions: [
             TextButton(
               onPressed: () {
@@ -168,7 +222,7 @@ class _MapScreenState extends State<MapScreen> {
             consumeTapEvents: true,
             polylineId: const PolylineId('route'),
             points: _convertToLatLng(_decodePolyline(route)),
-            color: Colors.blue.shade900,
+            color: Colors.red.shade900,
             width: 6,
             onTap: () {
               showTooltip();
@@ -245,15 +299,20 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final TextEditingController pickuploc = TextEditingController(
+        text: widget.info['pickup_other_address'].toString());
+    final TextEditingController deliveryloc = TextEditingController(
+        text: widget.info['delivery_other_address'].toString());
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pickup and Delivery'),
       ),
+      resizeToAvoidBottomInset: false,
       body: Stack(children: [
         GoogleMap(
             initialCameraPosition: CameraPosition(
               target: _center,
-              zoom: 13.0,
+              zoom: 12.0,
             ),
             onMapCreated: (controller) {
               setState(() {
@@ -265,18 +324,24 @@ class _MapScreenState extends State<MapScreen> {
             polylines: _polylines,
             markers: Set<Marker>.from(_markers)),
         Positioned(
-          top: 5.0,
-          left: 5.0,
-          right: 5.0,
-          child: SizedBox(
-              height: 40.0,
-              child: TextField(
+            top: 5.0,
+            left: 5.0,
+            right: 5.0,
+            child: Container(
+              constraints: const BoxConstraints(maxHeight: 200.0),
+              child: SingleChildScrollView(
+                  child: TextField(
+                controller: pickuploc,
                 keyboardType: TextInputType.text,
+                style: const TextStyle(
+                    color: Colors.black,
+                    fontSize: 12,
+                    overflow: TextOverflow.ellipsis),
                 decoration: InputDecoration(
                     filled: true,
-                    fillColor: Colors.white,
+                    fillColor: Colors.transparent,
                     enabledBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.grey),
+                      borderSide: const BorderSide(color: Colors.black),
                       borderRadius: BorderRadius.circular(70.0),
                     ),
                     focusedBorder: OutlineInputBorder(
@@ -288,24 +353,27 @@ class _MapScreenState extends State<MapScreen> {
                     prefixIcon: const Icon(Icons.location_on, size: 24),
                     prefixIconColor: Colors.red),
               )),
-        ),
+            )),
         Positioned(
-          top: 50.0,
+          top: 70.0,
           left: 5.0,
           right: 5.0,
-          child: SizedBox(
-              height: 40.0,
-              child: TextField(
+          child: Container(
+              constraints: const BoxConstraints(maxHeight: 200.0),
+              child: SingleChildScrollView(
+                  child: TextField(
+                controller: deliveryloc,
                 keyboardType: TextInputType.text,
+                style: const TextStyle(fontSize: 12, overflow: TextOverflow.ellipsis),
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: Colors.transparent,
                   labelText: 'Delivery Location',
                   labelStyle: TextStyle(color: Colors.orange.shade900),
                   prefixIcon: const Icon(Icons.pin_drop, size: 24),
                   prefixIconColor: Colors.red,
                   enabledBorder: OutlineInputBorder(
-                    borderSide: const BorderSide(color: Colors.grey),
+                    borderSide: const BorderSide(color: Colors.black),
                     borderRadius: BorderRadius.circular(70.0),
                   ),
                   focusedBorder: OutlineInputBorder(
@@ -313,7 +381,7 @@ class _MapScreenState extends State<MapScreen> {
                     borderRadius: BorderRadius.circular(70.0),
                   ),
                 ),
-              )),
+              ))),
         ),
       ]),
       floatingActionButton: FloatingActionButton(
@@ -345,9 +413,9 @@ class Directions {
 
     final response = await http.get(Uri.parse(apiUrl));
     final json = jsonDecode(response.body);
-
     if (json['status'] == 'OK') {
-      return json['routes'][0]['overview_polyline']['points'];
+      var routes = json['routes'][0]['overview_polyline']['points'];
+      return routes;
     } else {
       throw Exception('Failed to fetch directions');
     }

@@ -16,7 +16,7 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
    <application
         android:label="AAI Drive"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@drawable/ic_notification">
         <meta-data android:name="com.google.android.geo.API_KEY"
                android:value="AIzaSyBOvEQPPHOW99eyq_AmvvQg8sJRXQH9pqk"/>
         <activity

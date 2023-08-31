@@ -5,6 +5,7 @@ import 'package:drive/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:drive/pages/runsheet.dart';
+import 'package:package_info/package_info.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
@@ -16,13 +17,13 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   ApiService apiService = ApiService();
   Runsheet runsheet = Runsheet();
-  MyTaskPage taskPage = const MyTaskPage();
   // DBHelper dbHelper = DBHelper();
   bool isDarkMode = false;
   String mode = 'Light';
   int _currentIndex = 0;
   String currentPageTitle = 'My Task';
   Map<String, dynamic> driver = {};
+  String _appVersion = '';
 
   final List<Widget> _children = [
     const MyTaskPage(),
@@ -51,9 +52,11 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> user_info() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     final userdata = prefs.getString('user');
-    if (userdata != "") {
+    PackageInfo packageInfo = await PackageInfo.fromPlatform();
+    if (userdata != null) {
       setState(() {
-        driver = json.decode(userdata!);
+        driver = json.decode(userdata);
+        _appVersion = packageInfo.version;
       });
     }
   }
@@ -71,27 +74,25 @@ class _MainScreenState extends State<MainScreen> {
         data: isDarkMode ? kDarkTheme : kLightTheme,
         child: Scaffold(
           resizeToAvoidBottomInset: false,
-          appBar: AppBar(title: Text(currentPageTitle), actions: [
-            Builder(builder: (context) {
-              if (_currentIndex == 0) {
-                return IconButton(
-                  icon: const Icon(Icons.sync),
-                  tooltip: 'Reload',
-                  onPressed: () async {
-                    final params = {
-                      'page': 1,
-                      'filter': jsonEncode({'plate_no': driver['plate_id']}),
-                      'itemsPerPage': '999',
-                      'device': 'mobile'
-                    };
-                    await runsheet.runsheet(params);
-                  },
-                );
-              } else {
-                return Container();
-              }
-            })
-          ]),
+          appBar: AppBar(
+            title: Text(currentPageTitle),
+            // actions: [
+            //   Padding(
+            //       padding: const EdgeInsets.all(8.0),
+            //       child: Align(
+            //           alignment: Alignment.centerRight,
+            //           child: TextButton.icon(
+            //               onPressed: () async {
+            //                 await runsheet.runsheet();
+            //                 // _handleRefresh(context);
+            //               },
+            //               icon: const Icon(Icons.refresh, color: Colors.white),
+            //               label: const Text(
+            //                 'Refresh',
+            //                 style: TextStyle(color: Colors.white),
+            //               ))))
+            // ],
+          ),
           drawer: Drawer(
             child: ListView(
               children: <Widget>[
@@ -108,8 +109,7 @@ class _MainScreenState extends State<MainScreen> {
                     children: <Widget>[
                       const CircleAvatar(
                         radius: 40,
-                        backgroundImage:
-                            AssetImage('assets/images/profile.png'),
+                        backgroundImage: AssetImage('assets/images/profile.png'),
                       ),
                       const SizedBox(height: 5),
                       // Text(
@@ -134,7 +134,6 @@ class _MainScreenState extends State<MainScreen> {
                 ListTile(
                   leading: const Icon(
                     Icons.assignment_add,
-                    color: Colors.indigo,
                   ),
                   title: const Text('My Task', style: TextStyle()),
                   onTap: () {
@@ -142,16 +141,11 @@ class _MainScreenState extends State<MainScreen> {
                       _currentIndex = 0;
                       currentPageTitle = 'My Task';
                     });
-                    Navigator.pop(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const MyTaskPage()));
+                    Navigator.pop(context, MaterialPageRoute(builder: (context) => const MyTaskPage()));
                   },
                 ),
                 ListTile(
-                  leading: (isDarkMode
-                      ? const Icon(Icons.dark_mode)
-                      : const Icon(Icons.light_mode)),
+                  leading: (isDarkMode ? const Icon(Icons.dark_mode) : const Icon(Icons.light_mode)),
                   title: Text('$mode Mode', style: const TextStyle()),
                   trailing: Switch(
                     value: isDarkMode,
@@ -164,17 +158,64 @@ class _MainScreenState extends State<MainScreen> {
                   ),
                 ),
                 ListTile(
-                  leading: const Icon(Icons.logout, color: Colors.orange),
+                  leading: const Icon(
+                    Icons.build,
+                  ),
+                  title: const Text('Version', style: TextStyle()),
+                  trailing: Text(_appVersion),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.logout),
                   title: const Text('Logout', style: TextStyle()),
                   onTap: () async {
-                    SharedPreferences prefs =
-                        await SharedPreferences.getInstance();
-                    await prefs.clear();
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const LoginPage()),
-                      (Route<dynamic> route) => false,
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (BuildContext dialogContext) {
+                        return AlertDialog(
+                          title: const Text(
+                            'Are you sure you want to end the shift?',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          actionsAlignment: MainAxisAlignment.center,
+                          actions: [
+                            ElevatedButton(
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                },
+                                style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.orange.shade900,
+                                    minimumSize: const Size.fromHeight(40),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    )),
+                                child: const FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      'Cancel',
+                                      style: TextStyle(color: Colors.white),
+                                    ))),
+                            const SizedBox(height: 8),
+                            ElevatedButton.icon(
+                                onPressed: () {
+                                  resetPreferences();
+                                  Navigator.pushAndRemoveUntil(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => const LoginPage()),
+                                    (Route<dynamic> route) => false,
+                                  );
+                                },
+                                style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red.shade900,
+                                    minimumSize: const Size.fromHeight(40),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    )),
+                                icon: const Icon(Icons.logout),
+                                label: const FittedBox(fit: BoxFit.scaleDown, child: Text('Logout'))),
+                          ],
+                        );
+                      },
                     );
                   },
                 ),
@@ -183,5 +224,10 @@ class _MainScreenState extends State<MainScreen> {
           ),
           body: _children[_currentIndex],
         ));
+  }
+
+  Future<void> resetPreferences() async {
+    SharedPreferences preferences = await SharedPreferences.getInstance();
+    await preferences.clear();
   }
 }

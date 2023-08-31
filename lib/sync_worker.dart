@@ -1,5 +1,4 @@
 import 'package:workmanager/workmanager.dart';
-import 'package:http/http.dart' as http;
 
 void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
@@ -38,6 +37,6 @@ void registerSyncTask() {
     'syncTask', // Task ID
     'syncDataTask', // Task Name
     inputData: {}, // Optional input data for the task
-    frequency: Duration(minutes: 1),
+    frequency: const Duration(minutes: 1),
   );
 }

@@ -10,63 +10,110 @@ class Runsheet {
   List bookingList = [];
   Map<String, dynamic> driver = {};
 
-  Future<void> runsheet(params) async {
+  Future<void> runsheet() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     final userdata = prefs.getString('user');
-    if (userdata != "") {
-      driver = json.decode(userdata!);
+    if (userdata != null) {
+      driver = json.decode(userdata);
     }
-    final response = await apiService.getData('runsheet', params: params);
-    if (response.statusCode == 200) {
-      var responseData = json.decode(response.body);
-      var data = responseData['data']['data'];
-      List<Map<String, dynamic>> booking = [];
-      runsheetList = data.map((rn) {
-        if (rn['task'].length > 0) {
-          rn['task'].forEach((key, value) {
-            value['runsheet_id'] = rn['id'];
-            value['line_id'] = key;
-            booking.add(Map<String, dynamic>.from(value));
-          });
+    var filter = [
+      {
+        'field': 'plate_no',
+        'condition': '=',
+        'value': driver['plate_no'],
+        'andor': 'AND',
+        'nestedFilters': [],
+      },
+      {
+        'field': null,
+        'condition': null,
+        'value': null,
+        'andor': null,
+        'nestedFilters': [
+          {
+            "field": "status",
+            "condition": "=",
+            "value": "Active",
+            "andor": "OR"
+          },
+          {
+            "field": "status",
+            "condition": "=",
+            "value": "In-progress",
+            "andor": null
+          }
+        ],
+      },
+    ];
+    final params = {
+      'page': '1',
+      'filter': filter,
+      'itemsPerPage': '999',
+      'device': 'mobile'
+    };
+    await apiService.post(params, 'runsheetList').then((response) {
+      if (response['success'] == true) {
+        var data = response['data']['data'];
+        if (data != null) {
+          runsheetList = data.map((rn) {
+            if (rn['view_task'].length > 0) {
+              List<Map<String, dynamic>> booking = [];
+              rn['view_task'].forEach((value) {
+                var book = {
+                  'runsheet_id': rn['id'] ?? 0,
+                  'line_id': value['line_id'] ?? '',
+                  'address': value['address'] ?? '',
+                  'customer': value['customer'] ?? '',
+                  'delivery_expected_date': value['delivery_expected_date'] ?? '',
+                  'delivery_loc': value['delivery_loc'] ?? '',
+                  'delivery_other_address': value['delivery_other_address'] ?? '',
+                  'fixed': value['fixed'] ?? '',
+                  'item_cbm': value['item_cbm'] ?? '',
+                  'item_height': value['item_height'] ?? '',
+                  'item_length': value['item_length'] ?? '',
+                  'item_qty': value['item_qty'] ?? '',
+                  'item_width': value['item_width'] ?? '',
+                  'pickup_expected_date': value['pickup_expected_date'] ?? '',
+                  'pickup_loc': value['pickup_loc'] ?? '',
+                  'pickup_other_address': value['pickup_other_address'] ?? '',
+                  'reference': value['reference'] ?? '',
+                  'remarks': value['remarks'] ?? '',
+                  'source_id': value['src_id'] ?? '',
+                  'status': value['status'] ?? '',
+                  'task': value['task'] ?? '',
+                };
+                booking.add(book);
+              });
+              dbHelper.saveBooking('booking', booking);
+            }
+            return {
+              'runsheet_id': rn['id'],
+              'date_from': rn['date_from'] ?? '',
+              'date_to': rn['date_to'] ?? '',
+              'ar_no': rn['ar_no'] ?? '',
+              'dr_no': rn['dr_no'] ?? '',
+              'est_tot_cbm': rn['est_tot_cbm'] ?? '',
+              'est_tot_pcs': rn['est_tot_pcs'] ?? '',
+              'est_tot_wt': rn['est_tot_wt'] ?? '',
+              'est_tot_sqm': rn['est_tot_sqm'] ?? '',
+              'plate_no': rn['plate_no'] ?? '',
+              'plate_id': driver['plate_id'] ?? '',
+              'reference': rn['reference'] ?? '',
+              'remarks': rn['remarks'] ?? '',
+              'status': rn['status'] ?? ''
+            };
+          }).toList();
+          if (runsheetList.isNotEmpty) {
+            dbHelper.save('runsheet', runsheetList, pkey: 'runsheet_id');
+          }
+        } else {
+          print('Error: $response');
         }
-        return {
-          'id': rn['id'],
-          'runsheet_id': rn['id'],
-          'cbm': rn['cbm'],
-          'charging_type': rn['charging_type'],
-          'date_from': rn['date_from'],
-          'date_to': rn['date_to'],
-          'ar_no': rn['ar_no'],
-          'dr_no': rn['dr_no'],
-          'est_tot_cbm': rn['est_tot_cbm'],
-          'est_tot_pcs': rn['est_tot_pcs'],
-          'est_tot_wt': rn['est_tot_wt'],
-          'from_loc': rn['from_loc'],
-          'plate_no': rn['plate_no'],
-          'plate_id': driver['plate_id'],
-          'reference': rn['reference'],
-          'remarks': rn['remarks'],
-          'status': rn['status'],
-          'task': rn['task'],
-          'to_loc': rn['to_loc'],
-          'total_pcs': rn['total_pcs'],
-          'total_wt': rn['total_wt'],
-          'tracking_no': rn['tracking_no'],
-          'trucking_id': rn['trucking_id'],
-          'updated_at': rn['updated_at'],
-          'user_id': rn['user_id'],
-          'vehicle_id': rn['vehicle_id'],
-          'vehicle_type': rn['vehicle_type']
-        };
-      }).toList();
-      if (runsheetList.isNotEmpty) {
-        await dbHelper.save('runsheet', runsheetList, pkey: 'runsheet_id');
-        if (booking.isNotEmpty) {
-          await dbHelper.saveBooking('booking', booking);
-        }
+      } else {
+        print('Error: $response');
       }
-    } else {
-      print('Error: ${response.reasonPhrase}');
-    }
+    }).catchError((error) {
+      print(error);
+    });
   }
 }

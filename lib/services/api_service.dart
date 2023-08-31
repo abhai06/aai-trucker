@@ -6,8 +6,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class ApiService {
   final baseUrl = dotenv.env['BASE_URL'];
   postData(data, apiUrl) async {
-    var response = await http.post(Uri.parse('$baseUrl/$apiUrl'),
-        body: jsonEncode(data), headers: _setHeaders());
+    var response = await http.post(Uri.parse('$baseUrl/$apiUrl'), body: jsonEncode(data), headers: _setHeaders());
     if (response.statusCode == 200) {
       return json.decode(response.body.toString());
     } else {
@@ -25,15 +24,13 @@ class ApiService {
         'Charset': 'utf-8',
         'Authorization': 'Bearer $bearerToken',
       };
-      var url =
-          (id != null && id > 0) ? '$baseUrl/$apiUrl/$id' : '$baseUrl/$apiUrl';
-      var response = await http.post(Uri.parse(url),
-          body: jsonEncode(data), headers: head);
-      if (response.statusCode == 200) {
-        return json.decode(response.body.toString());
-      } else {
-        return 'Request failed with status: ${response.statusCode}.';
-      }
+      var url = (id != null && id > 0) ? '$baseUrl/$apiUrl/$id' : '$baseUrl/$apiUrl';
+      var response = await http.post(Uri.parse(url), body: jsonEncode(data), headers: head);
+      // if (response.statusCode == 200) {
+      return json.decode(response.body.toString());
+      // } else {
+      //   return response.statusCode;
+      // }
     } catch (e) {
       return e;
     }
@@ -68,8 +65,7 @@ class ApiService {
       'Authorization': 'Bearer $bearerToken'
     };
 
-    var url = Uri.parse('$baseUrl/$apiUrl').replace(
-        queryParameters: params != null ? _getQueryParams(params) : params);
+    var url = Uri.parse('$baseUrl/$apiUrl').replace(queryParameters: params != null ? _getQueryParams(params) : params);
     return http.get(url, headers: headers);
   }
 
