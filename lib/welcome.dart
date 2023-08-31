@@ -8,11 +8,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:drive/helper/db_helper.dart';
 import 'package:drive/main_screen.dart';
 import 'package:drive/services/api_service.dart';
+import 'package:drive/plateno.dart';
 
 import 'package:drive/pages/runsheet.dart';
 import 'package:drive/pages/tasklist.dart';
 import 'package:drive/pages/exceptionlist.dart';
 import 'package:drive/connectivity_service.dart';
+import 'package:flutter_typeahead/flutter_typeahead.dart';
 
 class WelcomePage extends StatefulWidget {
   const WelcomePage({Key? key}) : super(key: key);
@@ -28,28 +30,33 @@ class _WelcomePageState extends State<WelcomePage> {
   Runsheet runsheet = Runsheet();
   Tasklist tasklist = Tasklist();
   Exceptionlist exceptionlist = Exceptionlist();
-
+  TextEditingController plate = TextEditingController();
+  String? selectedPlate;
+  String plate_no = "";
   List runsheetList = [];
   List bookingList = [];
   bool _isLoading = true;
   Map<String, dynamic> driver = {};
   Future<void> user_info() async {
+    _isLoading = true;
+    await Future.delayed(const Duration(seconds: 2));
     SharedPreferences prefs = await SharedPreferences.getInstance();
     final userdata = prefs.getString('user');
     if (userdata != "") {
       setState(() {
         driver = json.decode(userdata!);
+        plate.text = driver['plate_no'];
       });
-      final task = {'itemsPerPage': '-1', 'group_by': '4'};
+      final task = {
+        'itemsPerPage': '-1',
+        'group_by': '4'
+      };
       tasklist.tasklist(task);
       exceptionlist.exception();
-      final params = {
-        'page': '1',
-        'filter': jsonEncode({'plate_no': driver['plate_id']}),
-        'itemsPerPage': '999',
-        'device': 'mobile'
-      };
-      runsheet.runsheet(params);
+      runsheet.runsheet();
+      setState(() {
+        _isLoading = false;
+      });
     } else {
       user_info;
     }
@@ -66,15 +73,43 @@ class _WelcomePageState extends State<WelcomePage> {
   @override
   void initState() {
     super.initState();
-    _initConnectivity();
-    _simulateLoading();
+    user_info();
+    plateList("");
   }
 
-  void _initConnectivity() async {
-    bool _isConnected = await connectivity.isConnected();
-    if (!_isConnected) {
-      ConnectivityService.noInternetDialog(context);
+  void _clearPlate() {
+    setState(() {
+      selectedPlate = null;
+      plate_no = "";
+      plate.clear();
+    });
+  }
+
+  Future<List<PlateNo>> plateList(String query) async {
+    var filter = [
+      {
+        'field': 'trucker',
+        'condition': '=',
+        'value': driver['trucker'],
+        'andor': null,
+        'nestedFilters': [],
+      },
+    ];
+    final params = {
+      'page': '1',
+      'filter': filter,
+      'itemsPerPage': '999',
+      'device': 'mobile'
+    };
+    var res = await apiService.post(params, 'vehicleList');
+    if (res['success'] == true) {
+      List<dynamic> data = res['data']['data'];
+      List<dynamic> options = List<dynamic>.from(data);
+      List<PlateNo> platex = options.map((option) => PlateNo.fromJson(option)).toList();
+      List<PlateNo> filteredOptions = platex.where((x) => x.plate_no.toString().toLowerCase().contains(query.toLowerCase())).toList();
+      return filteredOptions;
     }
+    return [];
   }
 
   @override
@@ -91,12 +126,14 @@ class _WelcomePageState extends State<WelcomePage> {
                   width: 100,
                 ),
               )
-            : Center(
+            : Container(
+                decoration: const BoxDecoration(image: DecorationImage(image: AssetImage('assets/images/maps.jpg'), fit: BoxFit.cover, opacity: 0.3)),
+                padding: const EdgeInsets.all(8.0),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const SizedBox(height: 150),
+                    const SizedBox(height: 50),
                     Text(
                       "Welcome ${driver['name']?.toUpperCase()}! \n",
                       textAlign: TextAlign.center,
@@ -111,41 +148,137 @@ class _WelcomePageState extends State<WelcomePage> {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 50),
-                    const Image(
-                      image: AssetImage("assets/images/driver.png"),
+                    Lottie.asset(
+                      "assets/animations/driver.json",
+                      animate: true,
+                      alignment: Alignment.center,
                       height: 150,
                       width: 150,
                     ),
-                    const SizedBox(height: 100),
+                    const SizedBox(height: 50),
                     Container(
                         padding: const EdgeInsets.all(16),
                         width: 300,
-                        child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                minimumSize: const Size.fromHeight(40),
+                        child: OutlinedButton.icon(
+                            icon: const Icon(Icons.local_shipping),
+                            style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.red,
+                                minimumSize: const Size.fromHeight(45),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(20),
                                 )),
-                            child: const FittedBox(
+                            label: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text("PLATE NO : ${driver['plate_no']}"),
+                            ),
+                            onPressed: () async {
+                              _selectDialog();
+                            })),
+                    Container(
+                        padding: const EdgeInsets.all(16),
+                        width: 300,
+                        child: ElevatedButton.icon(
+                            icon: const Icon(Icons.keyboard_double_arrow_right),
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red.shade900,
+                                minimumSize: const Size.fromHeight(45),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                )),
+                            label: const FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Text('GO ONLINE'),
                             ),
                             onPressed: () async {
-                              bool _isConnected =
-                                  await connectivity.isConnected();
-                              if (!_isConnected) {
+                              bool isConnected = await connectivity.isConnected();
+                              if (!isConnected) {
                                 ConnectivityService.noInternetDialog(context);
                               } else {
-                                Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                        builder: (context) =>
-                                            const MainScreen()));
+                                Navigator.push(context, MaterialPageRoute(builder: (context) => const MainScreen()));
                               }
                             })),
                   ],
                 ),
               ));
+  }
+
+  void _selectDialog() {
+    plate.text = driver['plate_no'];
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: Text(driver['trucker']),
+          content: Padding(
+            padding: const EdgeInsets.all(4.0),
+            child: TypeAheadField<PlateNo>(
+              textFieldConfiguration: TextFieldConfiguration(
+                controller: plate,
+                decoration: InputDecoration(
+                  contentPadding: const EdgeInsets.all(2.0),
+                  labelText: 'Plate No',
+                  hintText: 'Plate No',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: plate.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: _clearPlate,
+                        )
+                      : null,
+                ),
+                style: const TextStyle(
+                  fontSize: 16.0,
+                  color: Colors.black,
+                ),
+              ),
+              suggestionsCallback: (String pattern) async {
+                return await plateList(pattern);
+              },
+              itemBuilder: (context, PlateNo suggestion) {
+                return ListTile(
+                  title: Text("${suggestion.plate_no} - ${suggestion.type}"),
+                );
+              },
+              onSuggestionSelected: (PlateNo suggestion) {
+                setState(() {
+                  plate.text = suggestion.plate_no;
+                });
+              },
+            ),
+          ),
+          actions: [
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              icon: const Icon(Icons.close),
+              label: const Text(
+                'CANCEL',
+              ),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              icon: const Icon(Icons.published_with_changes),
+              label: const Text(
+                'CHANGE',
+              ),
+              onPressed: () async {
+                SharedPreferences prefs = await SharedPreferences.getInstance();
+                final Map<String, dynamic> user = driver;
+                user['plate_no'] = plate.text.toString();
+                prefs.setString('user', json.encode(user));
+                setState(() {
+                  driver = user;
+                  runsheet.runsheet();
+                });
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 }

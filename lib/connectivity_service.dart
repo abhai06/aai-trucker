@@ -1,6 +1,5 @@
 import 'package:connectivity/connectivity.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 class ConnectivityService extends ChangeNotifier {
   static final Connectivity _connectivity = Connectivity();
@@ -12,8 +11,7 @@ class ConnectivityService extends ChangeNotifier {
 
   Future<bool> isConnected() async {
     var connectivityResult = await (Connectivity().checkConnectivity());
-    if (connectivityResult == ConnectivityResult.mobile ||
-        connectivityResult == ConnectivityResult.wifi) {
+    if (connectivityResult == ConnectivityResult.mobile || connectivityResult == ConnectivityResult.wifi) {
       await pushUpdatesToServer();
       return true;
     } else {
