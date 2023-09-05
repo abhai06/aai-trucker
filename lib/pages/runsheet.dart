@@ -104,7 +104,7 @@ class Runsheet {
             };
           }).toList();
           if (runsheetList.isNotEmpty) {
-            dbHelper.save('runsheet', runsheetList, pkey: 'runsheet_id');
+            dbHelper.save('runsheet', runsheetList, pkey: 'reference');
           }
         } else {
           print('Error: $response');

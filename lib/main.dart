@@ -27,7 +27,6 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   await dotenv.load();
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
-
   const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@drawable/ic_notification');
   const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
   await flutterLocalNotificationsPlugin.initialize(initializationSettings, onDidReceiveNotificationResponse: onDidReceiveNotificationResponse);
@@ -89,6 +88,7 @@ class _MyAppState extends State<MyApp> {
     Timer.periodic(const Duration(seconds: 20), (timer) {
       if (mounted) {
         service.syncData();
+        initPusher();
       }
     });
     initialization();
@@ -109,6 +109,8 @@ class _MyAppState extends State<MyApp> {
       onDecryptionFailure: onDecryptionFailure,
       onMemberAdded: onMemberAdded,
       onMemberRemoved: onMemberRemoved,
+      activityTimeout: 120000,
+      pongTimeout: 30000,
     );
     await pusher.subscribe(channelName: "mobile");
     await pusher.connect();

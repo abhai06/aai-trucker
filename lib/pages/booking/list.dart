@@ -626,23 +626,177 @@ class _BookingListPageState extends State<BookingListPage> with SingleTickerProv
                                                         ),
                                                       )),
                                                     )
-                                                  : ElevatedButton(
-                                                      style: ElevatedButton.styleFrom(
-                                                          backgroundColor: Colors.blue.shade700,
-                                                          minimumSize: const Size.fromHeight(35),
-                                                          shape: RoundedRectangleBorder(
-                                                            borderRadius: BorderRadius.circular(20),
-                                                          )),
-                                                      child: FittedBox(
-                                                        fit: BoxFit.scaleDown,
-                                                        child: Row(mainAxisSize: MainAxisSize.max, children: [
-                                                          Text(item['next_status'] ?? ''),
-                                                          const SizedBox(width: 8.0),
-                                                        ]),
-                                                      ),
-                                                      onPressed: () {
-                                                        _showDialog(context, item);
-                                                      }))
+                                                  : item['status'] == 'Assigned'
+                                                      ? Row(
+                                                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                                          children: [
+                                                            Expanded(
+                                                                child: ElevatedButton.icon(
+                                                              style: ElevatedButton.styleFrom(
+                                                                  backgroundColor: const Color.fromARGB(255, 222, 8, 8),
+                                                                  minimumSize: const Size.fromHeight(40),
+                                                                  shape: RoundedRectangleBorder(
+                                                                    borderRadius: BorderRadius.circular(20),
+                                                                  )),
+                                                              onPressed: () {
+                                                                // Add your Decline button functionality here
+                                                                showDialog(
+                                                                    context: context,
+                                                                    barrierDismissible: false,
+                                                                    builder: (BuildContext context) {
+                                                                      String reason = 'Mechanical error/ problem / Vehicle breakdown';
+                                                                      List<String> _options = <String>[
+                                                                        "Mechanical error/ problem / Vehicle breakdown",
+                                                                        "Trucker's and Contractor Negligence ( ex. Unreachable via cellphone , Late reporting to duty of trucker, Late provision of trips from the coordinator, Budget related concerns)",
+                                                                        "Expired permits / Peza / Manila ",
+                                                                        "No Available Driver / Helper (due to an Emergency situation that has to attend / Sicked Trucker / Cannot report to work)",
+                                                                        "Coding Scheme",
+                                                                        "Non Peza Registered ",
+                                                                        "No Available truck based on the actual requirement.",
+                                                                        "Not updated registration / Insurance policies",
+                                                                        "With existing trips / Engaged to other customers",
+                                                                        "With current reservations.",
+                                                                      ];
+
+                                                                      return AlertDialog(
+                                                                        title: Text(item['reference'], textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
+                                                                        content: Container(
+                                                                            height: 95,
+                                                                            child: Column(mainAxisAlignment: MainAxisAlignment.start, children: [
+                                                                              const Text("Are you sure to decline this booking?", textAlign: TextAlign.center, style: TextStyle(color: Colors.black)),
+                                                                              const SizedBox(height: 10),
+                                                                              DropdownButtonFormField<String>(
+                                                                                isExpanded: true,
+                                                                                style: const TextStyle(overflow: TextOverflow.clip),
+                                                                                value: reason,
+                                                                                items: _options.map((String value) {
+                                                                                  return DropdownMenuItem<String>(
+                                                                                    value: value,
+                                                                                    child: Text(value, style: const TextStyle(overflow: TextOverflow.clip, color: Colors.black)),
+                                                                                  );
+                                                                                }).toList(),
+                                                                                onChanged: (String? newValue) {
+                                                                                  setState(() {
+                                                                                    reason = newValue as String;
+                                                                                  });
+                                                                                },
+                                                                                decoration: const InputDecoration(
+                                                                                  labelText: 'Reason',
+                                                                                  border: OutlineInputBorder(),
+                                                                                ),
+                                                                              ),
+                                                                            ])),
+                                                                        actions: [
+                                                                          FilledButton(
+                                                                            style: ElevatedButton.styleFrom(
+                                                                              backgroundColor: const Color.fromARGB(255, 222, 8, 8),
+                                                                            ),
+                                                                            child: const Text('CANCEL'),
+                                                                            onPressed: () {
+                                                                              Navigator.of(context).pop();
+                                                                            },
+                                                                          ),
+                                                                          FilledButton(
+                                                                            child: const Text('CONFIRM'),
+                                                                            onPressed: () {
+                                                                              updateStatus({
+                                                                                ...item,
+                                                                                'task_id': 24,
+                                                                                'task_code': 'DCLN',
+                                                                                'next_status': 'Declined',
+                                                                                'note': reason
+                                                                              });
+                                                                            },
+                                                                          ),
+                                                                        ],
+                                                                      );
+                                                                    });
+                                                              },
+                                                              icon: const Icon(Icons.close),
+                                                              label: const Text('DECLINE'),
+                                                            )),
+                                                            const SizedBox(width: 3),
+                                                            Expanded(
+                                                                child: ElevatedButton.icon(
+                                                              style: ElevatedButton.styleFrom(
+                                                                  backgroundColor: Colors.green.shade800,
+                                                                  minimumSize: const Size.fromHeight(40),
+                                                                  shape: RoundedRectangleBorder(
+                                                                    borderRadius: BorderRadius.circular(20),
+                                                                  )),
+                                                              onPressed: () {
+                                                                showDialog(
+                                                                    context: context,
+                                                                    barrierDismissible: false,
+                                                                    builder: (BuildContext context) {
+                                                                      return AlertDialog(
+                                                                        title: Text(item['reference'], textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
+                                                                        content: const Text("Are you sure to accept this booking?", textAlign: TextAlign.center, style: TextStyle(color: Colors.black)),
+                                                                        actions: [
+                                                                          FilledButton(
+                                                                            style: ElevatedButton.styleFrom(
+                                                                              backgroundColor: const Color.fromARGB(255, 222, 8, 8),
+                                                                            ),
+                                                                            child: const Text('CANCEL'),
+                                                                            onPressed: () {
+                                                                              Navigator.of(context).pop();
+                                                                            },
+                                                                          ),
+                                                                          FilledButton(
+                                                                            child: const Text('CONFIRM'),
+                                                                            onPressed: () {
+                                                                              updateStatus({
+                                                                                ...item,
+                                                                                'task_id': 25,
+                                                                                'task_code': 'ACPT',
+                                                                                'next_status': 'Accepted'
+                                                                              });
+                                                                            },
+                                                                          ),
+                                                                        ],
+                                                                      );
+                                                                    });
+                                                              },
+                                                              icon: const Icon(Icons.check),
+                                                              label: const Text('ACCEPT'),
+                                                            )),
+                                                          ],
+                                                        )
+                                                      : item['status'] == 'DCLN'
+                                                          ? Container(
+                                                              margin: const EdgeInsets.only(left: 5),
+                                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                                              decoration: BoxDecoration(
+                                                                color: Colors.red,
+                                                                borderRadius: BorderRadius.circular(20),
+                                                              ),
+                                                              child: const Center(
+                                                                  child: Text(
+                                                                'Booking Declined',
+                                                                style: TextStyle(
+                                                                  fontSize: 12,
+                                                                  fontWeight: FontWeight.bold,
+                                                                  color: Colors.white,
+                                                                ),
+                                                              )),
+                                                            )
+                                                          : ElevatedButton(
+                                                              style: ElevatedButton.styleFrom(
+                                                                  backgroundColor: Colors.blue.shade700,
+                                                                  minimumSize: const Size.fromHeight(35),
+                                                                  shape: RoundedRectangleBorder(
+                                                                    borderRadius: BorderRadius.circular(20),
+                                                                  )),
+                                                              child: FittedBox(
+                                                                fit: BoxFit.scaleDown,
+                                                                child: Row(mainAxisSize: MainAxisSize.max, children: [
+                                                                  Text(item['next_status'] ?? ''),
+                                                                  const SizedBox(width: 8.0),
+                                                                ]),
+                                                              ),
+                                                              onPressed: () {
+                                                                _showDialog(context, item);
+                                                              }))
                                           : Container()
                                     ])),
                               ],
@@ -1240,7 +1394,7 @@ class _BookingListPageState extends State<BookingListPage> with SingleTickerProv
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         backgroundColor: Colors.green,
         content: Text('Status Successfully Updated.'),
-        behavior: SnackBarBehavior.floating,
+        behavior: SnackBarBehavior.fixed,
       ));
     });
     setState(() {
