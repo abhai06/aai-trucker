@@ -175,169 +175,159 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
   }
 
   Widget previousTab() {
-    return _isLoading
-        ? Center(
-            child: Lottie.asset(
-              "assets/animations/loading.json",
-              animate: true,
-              alignment: Alignment.center,
-              height: 100,
-              width: 100,
-            ),
-          )
-        : FutureBuilder<List<dynamic>>(
-            future: fetchData(),
-            builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
-              final previousList = my_task.where((itm) => itm['reference'].toLowerCase().contains(searchQuery)).toList();
-              if (previousList.isNotEmpty) {
-                return ListView.builder(
-                    padding: const EdgeInsets.all(4),
-                    itemCount: previousList.length,
-                    itemBuilder: (context, index) {
-                      final item = previousList[index];
-                      DateTime dateFrom = DateTime.parse(item['date_from'] ?? '');
-                      final from = DateFormat('MMM d,yyyy h:mm a').format(dateFrom);
-                      DateTime dateTo = DateTime.parse(item['date_to'] ?? '');
-                      final to = DateFormat('MMM d,yyyy h:mm a').format(dateTo);
-                      final TextEditingController estTotWt = TextEditingController(text: item['est_tot_wt'].toString());
-                      final TextEditingController estTotSqm = TextEditingController(text: item['est_tot_sqm'].toString());
-                      final TextEditingController estTotPcs = TextEditingController(text: item['est_tot_pcs'].toString());
-                      final TextEditingController estTotCbm = TextEditingController(text: item['est_tot_cbm'].toString());
-                      return Card(
-                          shape: BeveledRectangleBorder(
-                            borderRadius: BorderRadius.circular(12.0),
+    return FutureBuilder<List<dynamic>>(
+        future: fetchData(),
+        builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
+          final previousList = my_task.where((itm) => itm['reference'].toLowerCase().contains(searchQuery)).toList();
+          if (previousList.isNotEmpty) {
+            return ListView.builder(
+                padding: const EdgeInsets.all(4),
+                itemCount: previousList.length,
+                itemBuilder: (context, index) {
+                  final item = previousList[index];
+                  DateTime dateFrom = DateTime.parse(item['date_from'] ?? '');
+                  final from = DateFormat('MMM d,yyyy h:mm a').format(dateFrom);
+                  DateTime dateTo = DateTime.parse(item['date_to'] ?? '');
+                  final to = DateFormat('MMM d,yyyy h:mm a').format(dateTo);
+                  final TextEditingController estTotWt = TextEditingController(text: item['est_tot_wt'].toString());
+                  final TextEditingController estTotSqm = TextEditingController(text: item['est_tot_sqm'].toString());
+                  final TextEditingController estTotPcs = TextEditingController(text: item['est_tot_pcs'].toString());
+                  final TextEditingController estTotCbm = TextEditingController(text: item['est_tot_cbm'].toString());
+                  return Card(
+                      shape: BeveledRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.0),
+                      ),
+                      shadowColor: Colors.black,
+                      elevation: 4,
+                      child: ListTile(
+                        onTap: () {
+                          setState(() {
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => BookingListPage(my_task[index])));
+                          });
+                        },
+                        // leading: const Icon(Icons.local_shipping, color: Colors.red),
+                        title: Text(
+                          item['reference'] ?? '',
+                          style: TextStyle(color: Colors.red.shade900, fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(
+                            'FROM :  $from',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                           ),
-                          shadowColor: Colors.black,
-                          elevation: 4,
-                          child: ListTile(
-                            onTap: () {
-                              setState(() {
-                                Navigator.push(context, MaterialPageRoute(builder: (context) => BookingListPage(my_task[index])));
-                              });
-                            },
-                            // leading: const Icon(Icons.local_shipping, color: Colors.red),
-                            title: Text(
-                              item['reference'] ?? '',
-                              style: TextStyle(color: Colors.red.shade900, fontWeight: FontWeight.bold),
+                          Text(
+                            'TO : $to',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                          Row(children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  TextField(
+                                    controller: estTotCbm,
+                                    readOnly: true,
+                                    decoration: const InputDecoration(labelText: 'Est. CBM', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
+                                    style: const TextStyle(fontSize: 11),
+                                  ),
+                                ],
+                              ),
                             ),
-                            subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(
-                                'FROM :  $from',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                              ),
-                              Text(
-                                'TO : $to',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                              ),
-                              Row(children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      TextField(
-                                        controller: estTotCbm,
-                                        readOnly: true,
-                                        decoration: const InputDecoration(labelText: 'Est. CBM', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
-                                        style: const TextStyle(fontSize: 11),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(
-                                  width: 10.0,
-                                  height: 10.0,
-                                ),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      TextField(
-                                        controller: estTotSqm,
-                                        readOnly: true,
-                                        keyboardType: TextInputType.text,
-                                        decoration: const InputDecoration(labelText: 'Est. SQM', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
-                                        style: const TextStyle(fontSize: 11),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(
-                                  width: 10.0,
-                                  height: 10.0,
-                                ),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      TextField(
-                                        controller: estTotPcs,
-                                        readOnly: true,
-                                        keyboardType: TextInputType.text,
-                                        decoration: const InputDecoration(labelText: 'Est. PCS', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
-                                        style: const TextStyle(fontSize: 11),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(
-                                  width: 10.0,
-                                  height: 10.0,
-                                ),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      TextField(
-                                        controller: estTotWt,
-                                        readOnly: true,
-                                        keyboardType: TextInputType.text,
-                                        decoration: const InputDecoration(labelText: 'Est. Wt', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
-                                        style: const TextStyle(fontSize: 11),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ]),
-                              Text(
-                                item['remarks'] ?? '',
-                                style: const TextStyle(fontSize: 12, overflow: TextOverflow.ellipsis, fontWeight: FontWeight.bold),
-                              ),
-                            ]),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  margin: const EdgeInsets.only(left: 5),
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.red.shade900,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    item['status'].toUpperCase(),
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                )
-                              ],
+                            const SizedBox(
+                              width: 10.0,
+                              height: 10.0,
                             ),
-                          ));
-                    });
-              } else {
-                return Center(
-                  child: Lottie.asset(
-                    "assets/animations/noitem.json",
-                    animate: true,
-                    alignment: Alignment.center,
-                    height: 300,
-                    width: 300,
-                  ),
-                );
-              }
-            });
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  TextField(
+                                    controller: estTotSqm,
+                                    readOnly: true,
+                                    keyboardType: TextInputType.text,
+                                    decoration: const InputDecoration(labelText: 'Est. SQM', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
+                                    style: const TextStyle(fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(
+                              width: 10.0,
+                              height: 10.0,
+                            ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  TextField(
+                                    controller: estTotPcs,
+                                    readOnly: true,
+                                    keyboardType: TextInputType.text,
+                                    decoration: const InputDecoration(labelText: 'Est. PCS', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
+                                    style: const TextStyle(fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(
+                              width: 10.0,
+                              height: 10.0,
+                            ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  TextField(
+                                    controller: estTotWt,
+                                    readOnly: true,
+                                    keyboardType: TextInputType.text,
+                                    decoration: const InputDecoration(labelText: 'Est. Wt', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
+                                    style: const TextStyle(fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ]),
+                          Text(
+                            item['remarks'] ?? '',
+                            style: const TextStyle(fontSize: 12, overflow: TextOverflow.ellipsis, fontWeight: FontWeight.bold),
+                          ),
+                        ]),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              margin: const EdgeInsets.only(left: 5),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade900,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                item['status'].toUpperCase(),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            )
+                          ],
+                        ),
+                      ));
+                });
+          } else {
+            return Center(
+              child: Lottie.asset(
+                "assets/animations/noitem.json",
+                animate: true,
+                alignment: Alignment.center,
+                height: 300,
+                width: 300,
+              ),
+            );
+          }
+        });
   }
 
   Widget todayTab() {

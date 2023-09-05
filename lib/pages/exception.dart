@@ -205,15 +205,18 @@ class _ExceptionPageState extends State<ExceptionPage> {
                               'remarks': note.text,
                               'booking_id': widget.item['source_id'],
                               'runsheet_id': widget.item['runsheet_id'],
-                              'attachement': attach
+                              'attachment': attach
                             };
                             await apiService.post(remarks, 'trRemarks').then((response) {
                               if (response['success'] == true) {
                                 setState(() {
+                                  note.clear();
+                                  attach.clear();
+                                  selectedImages!.clear();
                                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                                     backgroundColor: Colors.green,
                                     content: Text('Remarks sent successfully'),
-                                    behavior: SnackBarBehavior.floating,
+                                    behavior: SnackBarBehavior.fixed,
                                   ));
                                 });
                               } else {
