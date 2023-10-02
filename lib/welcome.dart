@@ -39,21 +39,20 @@ class _WelcomePageState extends State<WelcomePage> {
   Map<String, dynamic> driver = {};
   Future<void> user_info() async {
     _isLoading = true;
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(const Duration(seconds: 1));
     SharedPreferences prefs = await SharedPreferences.getInstance();
     final userdata = prefs.getString('user');
     if (userdata != "") {
       setState(() {
         driver = json.decode(userdata!);
-        plate.text = driver['plate_no'];
+        plate.text = driver['plate_no'] ?? '';
       });
       final task = {
         'itemsPerPage': '-1',
         'group_by': '4'
       };
-      tasklist.tasklist(task);
-      exceptionlist.exception();
       runsheet.runsheet();
+      tasklist.tasklist(task);
       setState(() {
         _isLoading = false;
       });
@@ -62,19 +61,10 @@ class _WelcomePageState extends State<WelcomePage> {
     }
   }
 
-  void _simulateLoading() async {
-    await Future.delayed(const Duration(seconds: 2));
-    setState(() {
-      user_info();
-      _isLoading = false;
-    });
-  }
-
   @override
   void initState() {
     super.initState();
     user_info();
-    plateList("");
   }
 
   void _clearPlate() {
@@ -86,30 +76,21 @@ class _WelcomePageState extends State<WelcomePage> {
   }
 
   Future<List<PlateNo>> plateList(String query) async {
-    var filter = [
-      {
-        'field': 'trucker',
-        'condition': '=',
-        'value': driver['trucker'],
-        'andor': null,
-        'nestedFilters': [],
-      },
-    ];
     final params = {
       'page': '1',
-      'filter': filter,
+      'trucker_company': driver['trucker'],
       'itemsPerPage': '999',
       'device': 'mobile'
     };
-    var res = await apiService.post(params, 'vehicleList');
-    if (res['success'] == true) {
-      List<dynamic> data = res['data']['data'];
-      List<dynamic> options = List<dynamic>.from(data);
-      List<PlateNo> platex = options.map((option) => PlateNo.fromJson(option)).toList();
-      List<PlateNo> filteredOptions = platex.where((x) => x.plate_no.toString().toLowerCase().contains(query.toLowerCase())).toList();
-      return filteredOptions;
-    }
-    return [];
+    return await apiService.getData('fleet', params: params).then((res) {
+      var data = json.decode(res.body.toString());
+      if (data['success'] == true) {
+        List<dynamic> options = List<dynamic>.from(data['data']['data']);
+        List<PlateNo> platex = options.map((option) => PlateNo.fromJson(option)).toList();
+        List<PlateNo> filteredOptions = platex.where((x) => x.plate_no.toString().toLowerCase().contains(query.toLowerCase())).toList();
+        return filteredOptions;
+      }
+    });
   }
 
   @override
@@ -203,11 +184,11 @@ class _WelcomePageState extends State<WelcomePage> {
   }
 
   void _selectDialog() {
-    plate.text = driver['plate_no'];
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
+        plate.text = driver['plate_no'] ?? '';
         return AlertDialog(
           title: Text(driver['trucker']),
           content: Padding(
@@ -242,6 +223,7 @@ class _WelcomePageState extends State<WelcomePage> {
               },
               onSuggestionSelected: (PlateNo suggestion) {
                 setState(() {
+                  print(suggestion);
                   plate.text = suggestion.plate_no;
                 });
               },

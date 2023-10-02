@@ -1,20 +1,16 @@
 class PlateNo {
-  final String plate_no;
+  final dynamic plate_no;
   final dynamic type;
-  // final String vehiclename;
-  final String trucker;
+  final dynamic trucker;
 
-  PlateNo(
-      {required this.plate_no,
-      required this.type,
-      //required this.vehiclename,
-      required this.trucker});
+  PlateNo({required this.plate_no, this.type, this.trucker});
 
   factory PlateNo.fromJson(Map<String, dynamic> json) {
-    return PlateNo(
-        plate_no: json['plate_no'],
-        type: json['type'],
-        //  vehiclename: json['vehiclename'],
-        trucker: json['trucker']);
+    return PlateNo(plate_no: json['plate_no'] ?? '', type: json['type'] ?? '', trucker: json['trucker'] ?? '');
   }
+  Map<String, dynamic> toJson() => {
+        "type": type,
+        "plate_no": plate_no,
+        "trucker": trucker,
+      };
 }

@@ -22,12 +22,12 @@ class Service {
           whereArgs: [
             0
           ],
-          orderBy: 'source_id ASC, task_id ASC, datetime ASC');
+          orderBy: 'booking_id ASC, datetime ASC');
       if (rows.isNotEmpty) {
         rows.forEach((data) async {
-          var attachment = await dbHelper.getAll('attachment', whereCondition: 'source_id = ? AND task_id = ?', whereArgs: [
-            data['source_id'],
-            data['task_id']
+          var attachment = await dbHelper.getAll('attachment', whereCondition: 'booking_id = ? AND task_code = ?', whereArgs: [
+            data['booking_id'],
+            data['task_code']
           ]);
 
           List<Map<String, dynamic>> attach = await Future.wait(attachment.map((att) async {
@@ -46,24 +46,16 @@ class Service {
           }).toList());
 
           var taskLog = {
-            'task': data['task'] ?? '',
-            'task_code': data['task_code'] ?? '',
-            'contact_person': data['contact_person'] ?? '',
-            'datetime': data['datetime'] ?? '',
-            'formList': 0,
-            'task_exception': data['task_exception'] ?? '',
-            'ln_id': data['line_id'] ?? 0,
-            'location': data['location'] ?? 1,
-            'src_id': data['source_id'] ?? '',
-            'task_id': data['task_id'] ?? '',
-            'note': data['note'] ?? '',
-            'task_type': data['task_type'] ?? '',
             'attachment': attach,
-            'approved_time_in': '',
-            'approved_time_out': ''
+            'booking': data['booking_id'],
+            'datetime': data['datetime'],
+            'notes': data['note'],
+            'runsheet': data['runsheet_id'],
+            'status': data['task_code'],
+            'transact_with': data['contact_person'],
+            'skip_status': true
           };
-
-          await apiService.post(taskLog, 'addTaskLogs', id: data['monitor_id']).then((response) {
+          apiService.post(taskLog, 'bookingStatusLogs').then((response) {
             if (response['success'] == true) {
               dbHelper.update(
                   'booking_logs',

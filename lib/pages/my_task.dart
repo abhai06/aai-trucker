@@ -31,6 +31,7 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
   late Map<String, dynamic> monitor;
   TextEditingController search = TextEditingController();
   String searchQuery = '';
+  String? plateNo;
 
   @override
   void initState() {
@@ -63,29 +64,43 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
     await Future.delayed(const Duration(seconds: 2));
     SharedPreferences prefs = await SharedPreferences.getInstance();
     final userdata = prefs.getString('user');
-    String? plateNo;
     if (userdata != null) {
       setState(() {
         var user = json.decode(userdata);
-        plateNo = user['plate_no'];
+        plateNo = user['plate_no'] ?? '';
       });
     }
     DateTime currentDate = DateTime.now();
-    DateTime now = DateTime(currentDate.year, currentDate.month, currentDate.day);
-    String today = DateFormat('yyyy-MM-dd').format(now);
-    var operation = _selectedTabIndex == 1 ? "=" : "<";
-    var dataList = await dbHelper.getAll('runsheet',
-        whereCondition: '(status = ? OR status = ?) AND plate_no = ? AND date_from $operation ?',
-        whereArgs: [
-          'Active',
-          'In-Progress',
-          plateNo,
-          today
-        ],
-        orderBy: 'date_from DESC');
-    setState(() {
-      my_task = dataList;
-    });
+    final today = "${currentDate.year}-${currentDate.month.toString().padLeft(2, '0')}-${currentDate.day.toString().padLeft(2, '0')} 00:00:00";
+    if (_selectedTabIndex == 0) {
+      var dataList = await dbHelper.getAll('runsheet',
+          whereCondition: "plate_no = ? AND date_from < ?",
+          whereArgs: [
+            plateNo,
+            today
+          ],
+          orderBy: 'date_from DESC');
+      if (mounted) {
+        setState(() {
+          my_task = dataList;
+        });
+      }
+    } else {
+      var dataList = await dbHelper.getAll('runsheet',
+          whereCondition: "plate_no = ? AND date_from <= ? AND date_to >= ?",
+          whereArgs: [
+            plateNo,
+            today,
+            today
+          ],
+          orderBy: 'date_from DESC');
+      if (mounted) {
+        setState(() {
+          my_task = dataList;
+        });
+      }
+    }
+
     _isLoading = false;
     return my_task;
   }
@@ -189,10 +204,10 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
                   final from = DateFormat('MMM d,yyyy h:mm a').format(dateFrom);
                   DateTime dateTo = DateTime.parse(item['date_to'] ?? '');
                   final to = DateFormat('MMM d,yyyy h:mm a').format(dateTo);
-                  final TextEditingController estTotWt = TextEditingController(text: item['est_tot_wt'].toString());
-                  final TextEditingController estTotSqm = TextEditingController(text: item['est_tot_sqm'].toString());
-                  final TextEditingController estTotPcs = TextEditingController(text: item['est_tot_pcs'].toString());
-                  final TextEditingController estTotCbm = TextEditingController(text: item['est_tot_cbm'].toString());
+                  final TextEditingController estTotWt = TextEditingController(text: "");
+                  final TextEditingController estTotSqm = TextEditingController(text: "");
+                  final TextEditingController estTotPcs = TextEditingController(text: "");
+                  final TextEditingController estTotCbm = TextEditingController(text: "");
                   return Card(
                       shape: BeveledRectangleBorder(
                         borderRadius: BorderRadius.circular(12.0),
@@ -200,19 +215,20 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
                       shadowColor: Colors.black,
                       elevation: 4,
                       child: ListTile(
+                        selectedTileColor: Colors.red.shade100,
                         onTap: () {
                           setState(() {
                             Navigator.push(context, MaterialPageRoute(builder: (context) => BookingListPage(my_task[index])));
                           });
                         },
-                        // leading: const Icon(Icons.local_shipping, color: Colors.red),
+                        // leading: const Icon(Icons.confirmation_number, color: Colors.grey),
                         title: Text(
                           item['reference'] ?? '',
-                          style: TextStyle(color: Colors.red.shade900, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: Colors.red.shade900, fontWeight: FontWeight.bold, fontSize: 18.0),
                         ),
                         subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Text(
-                            'FROM :  $from',
+                            'FR :  $from',
                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                           Text(
@@ -300,7 +316,7 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
                               margin: const EdgeInsets.only(left: 5),
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
-                                color: Colors.red.shade900,
+                                color: Colors.blue,
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
@@ -345,10 +361,10 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
                   final from = DateFormat('MMM d,yyyy h:mm a').format(dateFrom);
                   DateTime dateTo = DateTime.parse(item['date_to'] ?? '');
                   final to = DateFormat('MMM d,yyyy h:mm a').format(dateTo);
-                  final TextEditingController estTotWt = TextEditingController(text: item['est_tot_wt'].toString());
-                  final TextEditingController estTotSqm = TextEditingController(text: item['est_tot_sqm'].toString());
-                  final TextEditingController estTotPcs = TextEditingController(text: item['est_tot_pcs'].toString());
-                  final TextEditingController estTotCbm = TextEditingController(text: item['est_tot_cbm'].toString());
+                  final TextEditingController estTotWt = TextEditingController(text: "");
+                  final TextEditingController estTotSqm = TextEditingController(text: "");
+                  final TextEditingController estTotPcs = TextEditingController(text: "");
+                  final TextEditingController estTotCbm = TextEditingController(text: "");
                   return Card(
                       shape: BeveledRectangleBorder(
                         borderRadius: BorderRadius.circular(12.0),
@@ -361,14 +377,14 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
                             Navigator.push(context, MaterialPageRoute(builder: (context) => BookingListPage(my_task[index])));
                           });
                         },
-                        // leading: const Icon(Icons.local_shipping, color: Colors.red),
+                        // leading: const Icon(Icons.confirmation_number, color: Colors.grey),
                         title: Text(
                           item['reference'] ?? '',
                           style: TextStyle(color: Colors.red.shade900, fontWeight: FontWeight.bold),
                         ),
                         subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Text(
-                            'FROM :  $from',
+                            'FR :  $from',
                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                           Text(
@@ -456,7 +472,7 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
                               margin: const EdgeInsets.only(left: 5),
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
-                                color: Colors.red.shade900,
+                                color: Colors.blue,
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(

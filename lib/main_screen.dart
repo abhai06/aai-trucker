@@ -1,4 +1,5 @@
 import 'package:drive/login.dart';
+import 'package:drive/pages/feedback.dart';
 import 'package:drive/pages/my_task.dart';
 import 'package:flutter/material.dart';
 import 'package:drive/services/api_service.dart';
@@ -27,6 +28,7 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> _children = [
     const MyTaskPage(),
+    const FeedbackPage()
   ];
 
   final ThemeData kLightTheme = ThemeData(
@@ -158,6 +160,18 @@ class _MainScreenState extends State<MainScreen> {
                   ),
                 ),
                 ListTile(
+                    leading: const Icon(
+                      Icons.comment,
+                    ),
+                    title: const Text('Feedback', style: TextStyle()),
+                    onTap: () {
+                      setState(() {
+                        _currentIndex = 1;
+                        currentPageTitle = 'Feedback';
+                      });
+                      Navigator.pop(context, MaterialPageRoute(builder: (context) => const FeedbackPage()));
+                    }),
+                ListTile(
                   leading: const Icon(
                     Icons.build,
                   ),
@@ -184,7 +198,7 @@ class _MainScreenState extends State<MainScreen> {
                                   Navigator.of(context).pop();
                                 },
                                 style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.orange.shade900,
+                                    backgroundColor: Colors.white,
                                     minimumSize: const Size.fromHeight(40),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(20),
@@ -193,7 +207,7 @@ class _MainScreenState extends State<MainScreen> {
                                     fit: BoxFit.scaleDown,
                                     child: Text(
                                       'Cancel',
-                                      style: TextStyle(color: Colors.white),
+                                      style: TextStyle(color: Colors.red),
                                     ))),
                             const SizedBox(height: 8),
                             ElevatedButton.icon(

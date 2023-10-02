@@ -80,37 +80,36 @@ class _LoginPageState extends State<LoginPage> {
       await apiService.postData(data, 'login').then((res) async {
         if (res['success'] == true) {
           SharedPreferences prefs = await SharedPreferences.getInstance();
-          res['data']['plate_no'] = res['data']['record']['assigned_vehicle'];
-          res['data']['plate_id'] = res['data']['record']['assigned_vehicle_value'];
-          res['data']['trucker'] = res['data']['record']['trucker'];
-          res['data']['driver_contact'] = res['data']['record']['driver_contact'];
+          res['data']['plate_no'] = res['data']['record']['plate_no'];
+          res['data']['trucker'] = res['data']['record']['trucker_company'];
+          res['data']['driver_contact'] = res['data']['record']['name'];
           prefs.setString('token', res['data']['api_token']);
           prefs.setBool('isLoggedIn', true);
           prefs.setString('user', json.encode(res['data']));
+          await apiService.getData('app-version').then((v) async {
+            final responseData = json.decode(v.body.toString());
+            if (responseData['success'] == true) {
+              var data = responseData['data'];
+              latestVersion = data['version'];
+              url = data['url_link'];
 
-          final response = await apiService.getData('app-version');
-          if (response.statusCode == 200) {
-            final responseData = json.decode(response.body);
-            var data = responseData['data'];
-            latestVersion = data['version'];
-            url = data['url_link'];
-
-            setState(() {
-              if (_appVersion.toString() != latestVersion.toString()) {
-                appUpdate(context, url);
-              } else {
-                _isLoading = false;
-                _usernameController.clear();
-                _passwordController.clear();
-                Navigator.push(context, MaterialPageRoute(builder: (context) => const WelcomePage()));
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  backgroundColor: Colors.green,
-                  content: Text('Login Successfully'),
-                  behavior: SnackBarBehavior.floating,
-                ));
-              }
-            });
-          }
+              setState(() {
+                if (_appVersion.toString() != latestVersion.toString()) {
+                  appUpdate(context, url);
+                } else {
+                  _isLoading = false;
+                  _usernameController.clear();
+                  _passwordController.clear();
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const WelcomePage()));
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    backgroundColor: Colors.green,
+                    content: Text('Login Successfully'),
+                    behavior: SnackBarBehavior.floating,
+                  ));
+                }
+              });
+            }
+          });
         } else {
           setState(() {
             _isLoading = false;
@@ -191,7 +190,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        resizeToAvoidBottomInset: false,
+        resizeToAvoidBottomInset: true,
         body: Container(
             decoration: const BoxDecoration(image: DecorationImage(image: AssetImage('assets/images/maps.jpg'), fit: BoxFit.cover, opacity: 0.3)),
             child: Padding(
@@ -202,6 +201,7 @@ class _LoginPageState extends State<LoginPage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        const SizedBox(height: 130.0),
                         const Image(image: AssetImage('assets/images/aai.png'), height: 70, width: 70),
                         const SizedBox(height: 60.0),
                         TextFormField(
@@ -213,7 +213,7 @@ class _LoginPageState extends State<LoginPage> {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(90.0),
                             ),
-                            labelText: 'Username',
+                            labelText: 'USERNAME',
                             labelStyle: const TextStyle(color: Colors.black),
                             prefixIcon: const Icon(Icons.person, size: 24),
                             prefixIconColor: Colors.black,
@@ -227,7 +227,7 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             suffixIcon: _showClearIcon
                                 ? IconButton(
-                                    icon: const Icon(Icons.clear),
+                                    icon: const Icon(Icons.clear, color: Colors.red),
                                     onPressed: _clearText,
                                   )
                                 : null,
@@ -244,7 +244,7 @@ class _LoginPageState extends State<LoginPage> {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(90.0),
                             ),
-                            labelText: 'Password',
+                            labelText: 'PASSWORD',
                             labelStyle: const TextStyle(color: Colors.black),
                             prefixIcon: const Icon(Icons.lock_rounded, size: 24),
                             suffixIcon: Padding(
@@ -274,7 +274,7 @@ class _LoginPageState extends State<LoginPage> {
                               },
                               child: const Text('Forgot Password?', textAlign: TextAlign.end, style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold))),
                         ),
-                        const SizedBox(height: 24.0),
+                        const SizedBox(height: 20.0),
                         ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color.fromARGB(255, 222, 8, 8),
