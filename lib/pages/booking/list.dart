@@ -67,12 +67,12 @@ class _BookingListPageState extends State<BookingListPage> with SingleTickerProv
 
   Future<List<dynamic>> pickup_booking() async {
     _isLoading = true;
-    bool isTab = _selectedTabIndex == 0;
-    var task = "PICKUP";
-    final rows = await dbHelper.getAll('booking', whereCondition: 'runsheet_id = ? AND task = ?', whereArgs: [
-      widget.item['runsheet_id'],
-      task
+    // bool isTab = _selectedTabIndex == 0;
+    // var task = "PICKUP";
+    final rows = await dbHelper.getAll('booking', whereCondition: 'runsheet_id = ?', whereArgs: [
+      widget.item['runsheet_id']
     ]);
+    // print(rows);
     if (mounted) {
       setState(() {
         _pickup_items = rows.map((data) {
@@ -80,36 +80,72 @@ class _BookingListPageState extends State<BookingListPage> with SingleTickerProv
           String nextStatus = '';
           int taskId;
           String taskCode = '';
+          String task = 'PICKUP';
           int nextSequenceNo;
           String status = data['status'] ?? 'Assigned';
-          if (status == 'APA' || status == 'ARRIVE AT PICKUP ADDRESS') {
+          if (status == 'ACPT' || status == 'ACCEPT BOOKING') {
+            nextStatus = 'ARRIVE AT PICKUP ADDRESS';
+            taskId = 4;
+            taskCode = 'APA';
+            nextSequenceNo = 4;
+            task = 'PICKUP';
+          } else if (status == 'APA' || status == 'ARRIVE AT PICKUP ADDRESS') {
             nextStatus = 'START LOADING';
             taskId = 5;
             taskCode = 'STL';
             nextSequenceNo = sequenceNo + 1;
+            task = 'PICKUP';
           } else if (status == 'STL' || status == 'START LOADING') {
             nextStatus = 'FINISH LOADING';
             taskId = 6;
             taskCode = 'FIL';
             nextSequenceNo = sequenceNo + 1;
+            task = 'PICKUP';
           } else if (status == 'FIL' || status == 'FINISH LOADING') {
             nextStatus = 'TIME DEPARTURE AT PICKUP ADDR';
             taskId = 7;
             taskCode = 'TDP';
             nextSequenceNo = sequenceNo + 1;
+            task = 'PICKUP';
           } else if (status == 'TDP' || status == 'TIME DEPARTURE AT PICKUP ADDR') {
             nextStatus = 'ARRIVE AT DELIVERY ADDRESS';
             taskId = 8;
             taskCode = 'ADA';
             nextSequenceNo = sequenceNo + 1;
+            task = 'DELIVERY';
+          } else if (status == 'ADA' || status == 'ARRIVE AT DELIVERY ADDRESS') {
+            nextStatus = 'START UNLOADING';
+            taskId = 9;
+            taskCode = 'STU';
+            nextSequenceNo = sequenceNo + 1;
+            task = 'DELIVERY';
+          } else if (status == 'STU' || status == 'START UNLOADING') {
+            nextStatus = 'FINISH UNLOADING';
+            taskId = 10;
+            taskCode = 'FIU';
+            nextSequenceNo = sequenceNo + 1;
+            task = 'DELIVERY';
+          } else if (status == 'FIU' || status == 'FINISH UNLOADING') {
+            nextStatus = 'TIME DEPARTURE AT DELIVERY ADDR';
+            taskId = 11;
+            taskCode = 'TDD';
+            nextSequenceNo = sequenceNo + 1;
+            task = 'DELIVERY';
+          } else if (status == 'TDD' || status == 'TIME DEPARTURE AT DELIVERY ADDR') {
+            nextStatus = 'APPROVED TIME OUT';
+            taskId = 12;
+            taskCode = 'ATO';
+            nextSequenceNo = sequenceNo + 1;
+            task = 'DELIVERY';
           } else {
-            nextStatus = 'ARRIVE AT PICKUP ADDRESS';
-            taskId = 4;
-            taskCode = 'APA';
-            nextSequenceNo = sequenceNo;
+            nextStatus = data['status_name'];
+            taskId = 2;
+            taskCode = 'PAT';
+            nextSequenceNo = 4;
           }
           return {
             ...data,
+            'task': task,
             'status': status,
             'next_status': nextStatus,
             'task_id': taskId,
@@ -336,13 +372,14 @@ class _BookingListPageState extends State<BookingListPage> with SingleTickerProv
   @override
   void initState() {
     super.initState();
+    // print(widget.item);
     // Intl.defaultLocale = 'pt_BR';
     _simulateLoading();
-    _getRecordById(widget.item['runsheet_id']);
+    // _getRecordById(widget.item['runsheet_id']);
     _tabController = TabController(length: 2, vsync: this);
     _tabController!.addListener(_handleTabSelection);
     pickup_booking();
-    delivery_booking();
+    // delivery_booking();
   }
 
   @override
@@ -350,82 +387,83 @@ class _BookingListPageState extends State<BookingListPage> with SingleTickerProv
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(widget.item['reference'] ?? '')),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildPickupTab(),
-          _buildDeliveryTab()
-        ],
-      ),
-      bottomNavigationBar: BottomAppBar(
-        color: Colors.grey.shade900,
-        child: TabBar(
-          onTap: (int) {
-            if (int == 0) {
-              pickup_booking();
-            } else {
-              delivery_booking();
-            }
-          },
-          indicator: BoxDecoration(
-            color: Colors.red.shade900,
-          ),
-          indicatorColor: Colors.white,
-          indicatorWeight: 4.0,
-          controller: _tabController,
-          labelColor: Colors.white,
-          dividerColor: Colors.white,
-          tabs: const [
-            Tab(text: 'PICK-UP'),
-            Tab(text: 'DELIVERY'),
-          ],
-        ),
-      ),
-      floatingActionButton: Container(
-          margin: const EdgeInsets.only(bottom: 8.0),
-          child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, crossAxisAlignment: CrossAxisAlignment.end, children: [
-            (monitor_id == 0)
-                ? FloatingActionButton(
-                    backgroundColor: Colors.green,
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (BuildContext dialogContext) {
-                          return AlertDialog(
-                            title: const Text('Start Runsheet'),
-                            content: TextField(
-                              keyboardType: TextInputType.text,
-                              controller: start_remarks,
-                              decoration: const InputDecoration(
-                                labelText: 'Remarks',
-                              ),
-                            ),
-                            actions: [
-                              TextButton(
-                                child: const Text(
-                                  'CANCEL',
-                                  style: TextStyle(color: Colors.red),
-                                ),
-                                onPressed: () {
-                                  Navigator.of(context).pop();
-                                },
-                              ),
-                              TextButton(
-                                child: const Text('START'),
-                                onPressed: () {
-                                  startRunsheet();
-                                },
-                              ),
-                            ],
-                          );
-                        },
-                      );
-                    },
-                    child: const Text('START'))
-                : Container(),
-          ])),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      body: _buildPickupTab(),
+      // TabBarView(
+      //   controller: _tabController,
+      //   children: [
+      //     _buildPickupTab(),
+      //     _buildDeliveryTab()
+      //   ],
+      // ),
+      // bottomNavigationBar: BottomAppBar(
+      //   color: Colors.grey.shade900,
+      //   child: TabBar(
+      //     onTap: (int) {
+      //       if (int == 0) {
+      //         pickup_booking();
+      //       } else {
+      //         delivery_booking();
+      //       }
+      //     },
+      //     indicator: BoxDecoration(
+      //       color: Colors.red.shade900,
+      //     ),
+      //     indicatorColor: Colors.white,
+      //     indicatorWeight: 4.0,
+      //     controller: _tabController,
+      //     labelColor: Colors.white,
+      //     dividerColor: Colors.white,
+      //     tabs: const [
+      //       Tab(text: 'PICK-UP'),
+      //       Tab(text: 'DELIVERY'),
+      //     ],
+      //   ),
+      // ),
+      // floatingActionButton: Container(
+      //     margin: const EdgeInsets.only(bottom: 8.0),
+      //     child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, crossAxisAlignment: CrossAxisAlignment.end, children: [
+      //       (monitor_id == 0)
+      //           ? FloatingActionButton(
+      //               backgroundColor: Colors.green,
+      //               onPressed: () {
+      //                 showDialog(
+      //                   context: context,
+      //                   barrierDismissible: false,
+      //                   builder: (BuildContext dialogContext) {
+      //                     return AlertDialog(
+      //                       title: const Text('Start Runsheet'),
+      //                       content: TextField(
+      //                         keyboardType: TextInputType.text,
+      //                         controller: start_remarks,
+      //                         decoration: const InputDecoration(
+      //                           labelText: 'Remarks',
+      //                         ),
+      //                       ),
+      //                       actions: [
+      //                         TextButton(
+      //                           child: const Text(
+      //                             'CANCEL',
+      //                             style: TextStyle(color: Colors.red),
+      //                           ),
+      //                           onPressed: () {
+      //                             Navigator.of(context).pop();
+      //                           },
+      //                         ),
+      //                         TextButton(
+      //                           child: const Text('START'),
+      //                           onPressed: () {
+      //                             startRunsheet();
+      //                           },
+      //                         ),
+      //                       ],
+      //                     );
+      //                   },
+      //                 );
+      //               },
+      //               child: const Text('START'))
+      //           : Container(),
+      //     ])),
+      // floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
 
@@ -479,7 +517,7 @@ class _BookingListPageState extends State<BookingListPage> with SingleTickerProv
                                                 ),
                                               ),
                                               Text(
-                                                "Status : " + (item['status'] ?? ''),
+                                                "Status : " + (item['status_name'] ?? ''),
                                                 overflow: TextOverflow.ellipsis,
                                                 style: const TextStyle(
                                                   fontSize: 12,
@@ -529,32 +567,32 @@ class _BookingListPageState extends State<BookingListPage> with SingleTickerProv
                                             color: Colors.blue,
                                           ),
                                           title: const Text(
-                                            'Pick Up',
+                                            'PICK UP',
                                             style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                                           ),
-                                          trailing: Container(
-                                            margin: const EdgeInsets.only(left: 5),
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: Colors.blue,
-                                              borderRadius: BorderRadius.circular(20),
-                                            ),
-                                            child: Text(
-                                              item['task'] ?? '',
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.white,
-                                              ),
-                                            ),
-                                          ),
+                                          // trailing: Container(
+                                          //   margin: const EdgeInsets.only(left: 5),
+                                          //   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          //   decoration: BoxDecoration(
+                                          //     color: Colors.blue,
+                                          //     borderRadius: BorderRadius.circular(20),
+                                          //   ),
+                                          //   child: Text(
+                                          //     item['task'] ?? '',
+                                          //     style: const TextStyle(
+                                          //       fontSize: 12,
+                                          //       fontWeight: FontWeight.bold,
+                                          //       color: Colors.white,
+                                          //     ),
+                                          //   ),
+                                          // ),
                                           subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                             Text(
                                               pickupDtime,
                                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red, overflow: TextOverflow.ellipsis),
                                             ),
                                             Text(
-                                              item['pickup_loc'] ?? '',
+                                              item['pickup_name'] ?? '',
                                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, overflow: TextOverflow.ellipsis),
                                             ),
                                             Text(
@@ -570,7 +608,7 @@ class _BookingListPageState extends State<BookingListPage> with SingleTickerProv
                                             color: Colors.red,
                                           ),
                                           title: const Text(
-                                            'Delivery',
+                                            'DELIVERY',
                                             style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                                           ),
                                           subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -579,7 +617,7 @@ class _BookingListPageState extends State<BookingListPage> with SingleTickerProv
                                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red, overflow: TextOverflow.ellipsis),
                                             ),
                                             Text(
-                                              item['delivery_loc'] ?? '',
+                                              item['delivery_name'] ?? '',
                                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, overflow: TextOverflow.ellipsis),
                                             ),
                                             Text(
@@ -587,217 +625,196 @@ class _BookingListPageState extends State<BookingListPage> with SingleTickerProv
                                               style: const TextStyle(fontSize: 11, overflow: TextOverflow.ellipsis),
                                             ),
                                           ])),
-                                      (monitor_id > 0)
-                                          ? ListTile(
-                                              // leading: ElevatedButton(
-                                              //   style: ElevatedButton.styleFrom(
-                                              //       backgroundColor:
-                                              //           Colors.red.shade700,
-                                              //       shape:
-                                              //           RoundedRectangleBorder(
-                                              //         borderRadius:
-                                              //             BorderRadius.circular(
-                                              //                 20),
-                                              //       )),
-                                              //   onPressed: () {
-                                              //     setState(() {
-                                              //       _makePhoneCall(
-                                              //           '09353330652');
-                                              //     });
-                                              //   },
-                                              //   child: const Icon(Icons.call,
-                                              //       color: Colors.white),
-                                              // ),
-                                              title: (item['status'] == 'TDP' || item['status'] == 'TIME DEPARTURE AT PICKUP ADDR')
-                                                  ? Container(
-                                                      margin: const EdgeInsets.only(left: 5),
-                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                                      decoration: BoxDecoration(
-                                                        color: Colors.grey,
-                                                        borderRadius: BorderRadius.circular(20),
-                                                      ),
-                                                      child: const Center(
-                                                          child: Text(
-                                                        'Pick-Up Successfully',
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight: FontWeight.bold,
-                                                          color: Colors.white,
-                                                        ),
-                                                      )),
-                                                    )
-                                                  : item['status'] == 'Assigned'
-                                                      ? Row(
-                                                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                                          children: [
-                                                            Expanded(
-                                                                child: ElevatedButton.icon(
-                                                              style: ElevatedButton.styleFrom(
-                                                                  backgroundColor: const Color.fromARGB(255, 222, 8, 8),
-                                                                  minimumSize: const Size.fromHeight(40),
-                                                                  shape: RoundedRectangleBorder(
-                                                                    borderRadius: BorderRadius.circular(20),
-                                                                  )),
-                                                              onPressed: () {
-                                                                // Add your Decline button functionality here
-                                                                showDialog(
-                                                                    context: context,
-                                                                    barrierDismissible: false,
-                                                                    builder: (BuildContext context) {
-                                                                      String reason = 'Mechanical error/ problem / Vehicle breakdown';
-                                                                      List<String> _options = <String>[
-                                                                        "Mechanical error/ problem / Vehicle breakdown",
-                                                                        "Trucker's and Contractor Negligence ( ex. Unreachable via cellphone , Late reporting to duty of trucker, Late provision of trips from the coordinator, Budget related concerns)",
-                                                                        "Expired permits / Peza / Manila ",
-                                                                        "No Available Driver / Helper (due to an Emergency situation that has to attend / Sicked Trucker / Cannot report to work)",
-                                                                        "Coding Scheme",
-                                                                        "Non Peza Registered ",
-                                                                        "No Available truck based on the actual requirement.",
-                                                                        "Not updated registration / Insurance policies",
-                                                                        "With existing trips / Engaged to other customers",
-                                                                        "With current reservations.",
-                                                                      ];
-
-                                                                      return AlertDialog(
-                                                                        title: Text(item['reference'], textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
-                                                                        content: Container(
-                                                                            height: 95,
-                                                                            child: Column(mainAxisAlignment: MainAxisAlignment.start, children: [
-                                                                              const Text("Are you sure to decline this booking?", textAlign: TextAlign.center, style: TextStyle(color: Colors.black)),
-                                                                              const SizedBox(height: 10),
-                                                                              DropdownButtonFormField<String>(
-                                                                                isExpanded: true,
-                                                                                style: const TextStyle(overflow: TextOverflow.clip),
-                                                                                value: reason,
-                                                                                items: _options.map((String value) {
-                                                                                  return DropdownMenuItem<String>(
-                                                                                    value: value,
-                                                                                    child: Text(value, style: const TextStyle(overflow: TextOverflow.clip, color: Colors.black)),
-                                                                                  );
-                                                                                }).toList(),
-                                                                                onChanged: (String? newValue) {
-                                                                                  setState(() {
-                                                                                    reason = newValue as String;
-                                                                                  });
-                                                                                },
-                                                                                decoration: const InputDecoration(
-                                                                                  labelText: 'Reason',
-                                                                                  border: OutlineInputBorder(),
-                                                                                ),
-                                                                              ),
-                                                                            ])),
-                                                                        actions: [
-                                                                          FilledButton(
-                                                                            style: ElevatedButton.styleFrom(
-                                                                              backgroundColor: const Color.fromARGB(255, 222, 8, 8),
-                                                                            ),
-                                                                            child: const Text('CANCEL'),
-                                                                            onPressed: () {
-                                                                              Navigator.of(context).pop();
-                                                                            },
-                                                                          ),
-                                                                          FilledButton(
-                                                                            child: const Text('CONFIRM'),
-                                                                            onPressed: () {
-                                                                              updateStatus({
-                                                                                ...item,
-                                                                                'task_id': 24,
-                                                                                'task_code': 'DCLN',
-                                                                                'next_status': 'Declined',
-                                                                                'note': reason
-                                                                              });
-                                                                            },
-                                                                          ),
-                                                                        ],
-                                                                      );
-                                                                    });
-                                                              },
-                                                              icon: const Icon(Icons.close),
-                                                              label: const Text('DECLINE'),
-                                                            )),
-                                                            const SizedBox(width: 3),
-                                                            Expanded(
-                                                                child: ElevatedButton.icon(
-                                                              style: ElevatedButton.styleFrom(
-                                                                  backgroundColor: Colors.green.shade800,
-                                                                  minimumSize: const Size.fromHeight(40),
-                                                                  shape: RoundedRectangleBorder(
-                                                                    borderRadius: BorderRadius.circular(20),
-                                                                  )),
-                                                              onPressed: () {
-                                                                showDialog(
-                                                                    context: context,
-                                                                    barrierDismissible: false,
-                                                                    builder: (BuildContext context) {
-                                                                      return AlertDialog(
-                                                                        title: Text(item['reference'], textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
-                                                                        content: const Text("Are you sure to accept this booking?", textAlign: TextAlign.center, style: TextStyle(color: Colors.black)),
-                                                                        actions: [
-                                                                          FilledButton(
-                                                                            style: ElevatedButton.styleFrom(
-                                                                              backgroundColor: const Color.fromARGB(255, 222, 8, 8),
-                                                                            ),
-                                                                            child: const Text('CANCEL'),
-                                                                            onPressed: () {
-                                                                              Navigator.of(context).pop();
-                                                                            },
-                                                                          ),
-                                                                          FilledButton(
-                                                                            child: const Text('CONFIRM'),
-                                                                            onPressed: () {
-                                                                              updateStatus({
-                                                                                ...item,
-                                                                                'task_id': 25,
-                                                                                'task_code': 'ACPT',
-                                                                                'next_status': 'Accepted'
-                                                                              });
-                                                                            },
-                                                                          ),
-                                                                        ],
-                                                                      );
-                                                                    });
-                                                              },
-                                                              icon: const Icon(Icons.check),
-                                                              label: const Text('ACCEPT'),
-                                                            )),
-                                                          ],
-                                                        )
-                                                      : item['status'] == 'DCLN'
-                                                          ? Container(
-                                                              margin: const EdgeInsets.only(left: 5),
-                                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                                              decoration: BoxDecoration(
-                                                                color: Colors.red,
+                                      ListTile(
+                                          // leading: ElevatedButton(
+                                          //   style: ElevatedButton.styleFrom(
+                                          //       backgroundColor:
+                                          //           Colors.red.shade700,
+                                          //       shape:
+                                          //           RoundedRectangleBorder(
+                                          //         borderRadius:
+                                          //             BorderRadius.circular(
+                                          //                 20),
+                                          //       )),
+                                          //   onPressed: () {
+                                          //     setState(() {
+                                          //       _makePhoneCall(
+                                          //           '09353330652');
+                                          //     });
+                                          //   },
+                                          //   child: const Icon(Icons.call,
+                                          //       color: Colors.white),
+                                          // ),
+                                          title: (item['status'] == 'TDD' || item['status'] == 'EOT' || item['status'] == 'FTD' || item['status'] == 'FTP')
+                                              ? ((item['status'] == 'TDD')
+                                                  ? const Center(
+                                                      child: Text(
+                                                      '*** DELIVERED SUCCESSFULLY ***',
+                                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red),
+                                                    ))
+                                                  : Center(
+                                                      child: Text("*** ${item['status_name']} ***",
+                                                          style: const TextStyle(
+                                                            fontSize: 14,
+                                                            fontWeight: FontWeight.bold,
+                                                            color: Colors.red,
+                                                          ))))
+                                              : (item['status'] == 'Assigned' || item['status'] == 'PAT')
+                                                  ? Row(
+                                                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                                      children: [
+                                                        Expanded(
+                                                            child: ElevatedButton.icon(
+                                                          style: ElevatedButton.styleFrom(
+                                                              backgroundColor: const Color.fromARGB(255, 222, 8, 8),
+                                                              minimumSize: const Size.fromHeight(40),
+                                                              shape: RoundedRectangleBorder(
                                                                 borderRadius: BorderRadius.circular(20),
-                                                              ),
-                                                              child: const Center(
-                                                                  child: Text(
-                                                                'Booking Declined',
-                                                                style: TextStyle(
-                                                                  fontSize: 12,
-                                                                  fontWeight: FontWeight.bold,
-                                                                  color: Colors.white,
-                                                                ),
                                                               )),
-                                                            )
-                                                          : ElevatedButton(
-                                                              style: ElevatedButton.styleFrom(
-                                                                  backgroundColor: Colors.blue.shade700,
-                                                                  minimumSize: const Size.fromHeight(35),
-                                                                  shape: RoundedRectangleBorder(
-                                                                    borderRadius: BorderRadius.circular(20),
-                                                                  )),
-                                                              child: FittedBox(
-                                                                fit: BoxFit.scaleDown,
-                                                                child: Row(mainAxisSize: MainAxisSize.max, children: [
-                                                                  Text(item['next_status'] ?? ''),
-                                                                  const SizedBox(width: 8.0),
-                                                                ]),
-                                                              ),
-                                                              onPressed: () {
-                                                                _showDialog(context, item);
-                                                              }))
-                                          : Container()
+                                                          onPressed: () {
+                                                            showDialog(
+                                                                context: context,
+                                                                barrierDismissible: false,
+                                                                builder: (BuildContext context) {
+                                                                  String reason = 'Mechanical error/ problem / Vehicle breakdown';
+                                                                  List<String> options = <String>[
+                                                                    "Mechanical error/ problem / Vehicle breakdown",
+                                                                    "Trucker's and Contractor Negligence ( ex. Unreachable via cellphone , Late reporting to duty of trucker, Late provision of trips from the coordinator, Budget related concerns)",
+                                                                    "Expired permits / Peza / Manila ",
+                                                                    "No Available Driver / Helper (due to an Emergency situation that has to attend / Sicked Trucker / Cannot report to work)",
+                                                                    "Coding Scheme",
+                                                                    "Non Peza Registered ",
+                                                                    "No Available truck based on the actual requirement.",
+                                                                    "Not updated registration / Insurance policies",
+                                                                    "With existing trips / Engaged to other customers",
+                                                                    "With current reservations.",
+                                                                  ];
+
+                                                                  return AlertDialog(
+                                                                    title: Text(item['reference'], textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
+                                                                    content: SizedBox(
+                                                                        height: 95,
+                                                                        child: Column(mainAxisAlignment: MainAxisAlignment.start, children: [
+                                                                          const Text("Are you sure to decline this booking?", textAlign: TextAlign.center, style: TextStyle(color: Colors.black)),
+                                                                          const SizedBox(height: 10),
+                                                                          DropdownButtonFormField<String>(
+                                                                            isExpanded: true,
+                                                                            style: const TextStyle(overflow: TextOverflow.clip),
+                                                                            value: reason,
+                                                                            items: options.map((String value) {
+                                                                              return DropdownMenuItem<String>(
+                                                                                value: value,
+                                                                                child: Text(value, style: const TextStyle(overflow: TextOverflow.clip, color: Colors.black)),
+                                                                              );
+                                                                            }).toList(),
+                                                                            onChanged: (String? newValue) {
+                                                                              setState(() {
+                                                                                reason = newValue as String;
+                                                                              });
+                                                                            },
+                                                                            decoration: const InputDecoration(
+                                                                              labelText: 'Reason',
+                                                                              border: OutlineInputBorder(),
+                                                                            ),
+                                                                          ),
+                                                                        ])),
+                                                                    actions: [
+                                                                      FilledButton(
+                                                                        style: ElevatedButton.styleFrom(
+                                                                          backgroundColor: const Color.fromARGB(255, 222, 8, 8),
+                                                                        ),
+                                                                        child: const Text('CANCEL'),
+                                                                        onPressed: () {
+                                                                          Navigator.of(context).pop();
+                                                                        },
+                                                                      ),
+                                                                      FilledButton(
+                                                                        child: const Text('CONFIRM'),
+                                                                        onPressed: () {
+                                                                          updateStatus({
+                                                                            ...item,
+                                                                            'task_code': 'DCLN',
+                                                                            'next_status': 'DECLINED BOOKING',
+                                                                            'note': reason
+                                                                          });
+                                                                        },
+                                                                      ),
+                                                                    ],
+                                                                  );
+                                                                });
+                                                          },
+                                                          icon: const Icon(Icons.close),
+                                                          label: const Text('DECLINE'),
+                                                        )),
+                                                        const SizedBox(width: 3),
+                                                        Expanded(
+                                                            child: ElevatedButton.icon(
+                                                          style: ElevatedButton.styleFrom(
+                                                              backgroundColor: Colors.green.shade800,
+                                                              minimumSize: const Size.fromHeight(40),
+                                                              shape: RoundedRectangleBorder(
+                                                                borderRadius: BorderRadius.circular(20),
+                                                              )),
+                                                          onPressed: () {
+                                                            showDialog(
+                                                                context: context,
+                                                                barrierDismissible: false,
+                                                                builder: (BuildContext context) {
+                                                                  return AlertDialog(
+                                                                    title: Text(item['reference'], textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
+                                                                    content: const Text("Are you sure to accept this booking?", textAlign: TextAlign.center, style: TextStyle(color: Colors.black)),
+                                                                    actions: [
+                                                                      FilledButton(
+                                                                        style: ElevatedButton.styleFrom(
+                                                                          backgroundColor: const Color.fromARGB(255, 222, 8, 8),
+                                                                        ),
+                                                                        child: const Text('CANCEL'),
+                                                                        onPressed: () {
+                                                                          Navigator.of(context).pop();
+                                                                        },
+                                                                      ),
+                                                                      FilledButton(
+                                                                        child: const Text('CONFIRM'),
+                                                                        onPressed: () {
+                                                                          updateStatus({
+                                                                            ...item,
+                                                                            'task_code': 'ACPT',
+                                                                            'next_status': 'ACCEPT BOOKING'
+                                                                          });
+                                                                        },
+                                                                      ),
+                                                                    ],
+                                                                  );
+                                                                });
+                                                          },
+                                                          icon: const Icon(Icons.check),
+                                                          label: const Text('ACCEPT'),
+                                                        )),
+                                                      ],
+                                                    )
+                                                  : item['status'] == 'DCLN'
+                                                      ? const Center(
+                                                          child: Text(
+                                                          '*** BOOKING DECLINED ***',
+                                                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red),
+                                                        ))
+                                                      : ElevatedButton(
+                                                          style: ElevatedButton.styleFrom(
+                                                              backgroundColor: (item['task'] == 'DELIVERY') ? Colors.green.shade700 : Colors.blue.shade700,
+                                                              minimumSize: const Size.fromHeight(35),
+                                                              shape: RoundedRectangleBorder(
+                                                                borderRadius: BorderRadius.circular(20),
+                                                              )),
+                                                          child: FittedBox(
+                                                            fit: BoxFit.scaleDown,
+                                                            child: Row(mainAxisSize: MainAxisSize.max, children: [
+                                                              Text(item['next_status'] ?? ''),
+                                                              const SizedBox(width: 8.0),
+                                                            ]),
+                                                          ),
+                                                          onPressed: () {
+                                                            _showDialog(context, item);
+                                                          }))
                                     ])),
                               ],
                             ),
@@ -945,7 +962,7 @@ class _BookingListPageState extends State<BookingListPage> with SingleTickerProv
                                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red, overflow: TextOverflow.ellipsis),
                                             ),
                                             Text(
-                                              item['pickup_loc'] ?? '',
+                                              item['pickup_city'] ?? '',
                                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, overflow: TextOverflow.ellipsis),
                                             ),
                                             Text(
@@ -970,7 +987,7 @@ class _BookingListPageState extends State<BookingListPage> with SingleTickerProv
                                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red, overflow: TextOverflow.ellipsis),
                                             ),
                                             Text(
-                                              item['delivery_loc'] ?? '',
+                                              item['delivery_city'] ?? '',
                                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, overflow: TextOverflow.ellipsis),
                                             ),
                                             Text(
@@ -1169,8 +1186,9 @@ class _BookingListPageState extends State<BookingListPage> with SingleTickerProv
                                                   await imageFile.copy(tempPath);
 
                                                   final files = {
-                                                    'source_id': data['source_id'] ?? '',
-                                                    'task_id': data['task_id'] ?? '',
+                                                    'booking_id': data['booking_id'] ?? '',
+                                                    'runsheet_id': data['runsheet_id'] ?? '',
+                                                    'task_code': data['task_code'] ?? '',
                                                     'attach': filename
                                                   };
                                                   setState(() {
@@ -1189,8 +1207,9 @@ class _BookingListPageState extends State<BookingListPage> with SingleTickerProv
                                                   final tempPath = path.join(directory.path, filename);
                                                   await imagePath.copy(tempPath);
                                                   final files = {
-                                                    'source_id': data['source_id'] ?? '',
-                                                    'task_id': data['task_id'] ?? '',
+                                                    'booking_id': data['booking_id'] ?? '',
+                                                    'runsheet_id': data['runsheet_id'] ?? '',
+                                                    'task_code': data['task_code'] ?? '',
                                                     'attach': filename
                                                   };
                                                   setState(() {
@@ -1357,8 +1376,8 @@ class _BookingListPageState extends State<BookingListPage> with SingleTickerProv
 
       setState(() {
         final files = {
-          'source_id': data['source_id'] ?? '',
-          'task_id': data['task_id'] ?? '',
+          'booking_id': data['booking_id'] ?? '',
+          'task_code': data['task_code'] ?? '',
           'attach': filename
         };
         attach.add(files);
@@ -1366,9 +1385,13 @@ class _BookingListPageState extends State<BookingListPage> with SingleTickerProv
     }
     final book = {
       'status': data['task_code'] ?? '',
-      'sequence_no': data['next_sequence_no'] ?? ''
+      'status_name': data['next_status'] ?? '',
+      'sequence_no': data['next_sequence_no'] ?? '',
+      'task': data[''] ?? ''
     };
-    dbHelper.update('booking', book, data['id']);
+    setState(() {
+      dbHelper.update('booking', book, data['id']);
+    });
     final task = {
       'task': data['next_status'] ?? '',
       'task_type': data['task'] ?? '',
@@ -1376,11 +1399,9 @@ class _BookingListPageState extends State<BookingListPage> with SingleTickerProv
       'contact_person': data['receive_by'] ?? '',
       'datetime': data['datetime'] ?? dateTime,
       'task_exception': data['task_exception'] ?? '',
-      'line_id': data['line_id'] ?? '',
-      'source_id': data['source_id'] ?? '',
-      'task_id': data['task_id'] ?? '',
+      'booking_id': data['booking_id'] ?? '',
       'note': data['note'] ?? '',
-      'monitor_id': monitor_id,
+      'runsheet_id': widget.item['runsheet_id'],
       'flag': 0
     };
     setState(() {
@@ -1389,6 +1410,7 @@ class _BookingListPageState extends State<BookingListPage> with SingleTickerProv
       if (attach.isNotEmpty) {
         dbHelper.save('attachment', attach);
       }
+      pickup_booking();
     });
     setState(() {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(

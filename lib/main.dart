@@ -88,13 +88,13 @@ class _MyAppState extends State<MyApp> {
     Timer.periodic(const Duration(seconds: 20), (timer) {
       if (mounted) {
         service.syncData();
-        initPusher();
+        // initPusher();
       }
     });
     initialization();
     openDatabaseOrInitialize();
     checkLoggedIn();
-    initPusher();
+    // initPusher();
   }
 
   void initPusher() async {

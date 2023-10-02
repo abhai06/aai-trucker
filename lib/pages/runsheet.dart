@@ -1,13 +1,16 @@
+import 'dart:async';
+
 import 'package:drive/helper/db_helper.dart';
 import 'dart:convert';
 import 'package:drive/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:drive/pages/trip.dart';
 
 class Runsheet {
   final ApiService apiService = ApiService();
   DBHelper dbHelper = DBHelper();
-  List runsheetList = [];
-  List bookingList = [];
+  List<Map<String, dynamic>> runsheetList = [];
+  List<Map<String, dynamic>> bookingList = [];
   Map<String, dynamic> driver = {};
 
   Future<void> runsheet() async {
@@ -16,104 +19,85 @@ class Runsheet {
     if (userdata != null) {
       driver = json.decode(userdata);
     }
-    var filter = [
-      {
-        'field': 'plate_no',
-        'condition': '=',
-        'value': driver['plate_no'],
-        'andor': 'AND',
-        'nestedFilters': [],
-      },
-      {
-        'field': null,
-        'condition': null,
-        'value': null,
-        'andor': null,
-        'nestedFilters': [
-          {
-            "field": "status",
-            "condition": "=",
-            "value": "Active",
-            "andor": "OR"
-          },
-          {
-            "field": "status",
-            "condition": "=",
-            "value": "In-progress",
-            "andor": null
-          }
-        ],
-      },
-    ];
     final params = {
       'page': '1',
-      'filter': filter,
+      'plate_no': driver['plate_no'],
       'itemsPerPage': '999',
       'device': 'mobile'
     };
-    await apiService.post(params, 'runsheetList').then((response) {
-      if (response['success'] == true) {
-        var data = response['data']['data'];
-        if (data != null) {
-          runsheetList = data.map((rn) {
-            if (rn['view_task'].length > 0) {
-              List<Map<String, dynamic>> booking = [];
-              rn['view_task'].forEach((value) {
-                var book = {
-                  'runsheet_id': rn['id'] ?? 0,
-                  'line_id': value['line_id'] ?? '',
-                  'address': value['address'] ?? '',
-                  'customer': value['customer'] ?? '',
-                  'delivery_expected_date': value['delivery_expected_date'] ?? '',
-                  'delivery_loc': value['delivery_loc'] ?? '',
-                  'delivery_other_address': value['delivery_other_address'] ?? '',
-                  'fixed': value['fixed'] ?? '',
-                  'item_cbm': value['item_cbm'] ?? '',
-                  'item_height': value['item_height'] ?? '',
-                  'item_length': value['item_length'] ?? '',
-                  'item_qty': value['item_qty'] ?? '',
-                  'item_width': value['item_width'] ?? '',
-                  'pickup_expected_date': value['pickup_expected_date'] ?? '',
-                  'pickup_loc': value['pickup_loc'] ?? '',
-                  'pickup_other_address': value['pickup_other_address'] ?? '',
-                  'reference': value['reference'] ?? '',
-                  'remarks': value['remarks'] ?? '',
-                  'source_id': value['src_id'] ?? '',
-                  'status': value['status'] ?? '',
-                  'task': value['task'] ?? '',
-                };
-                booking.add(book);
-              });
-              dbHelper.saveBooking('booking', booking);
-            }
-            return {
-              'runsheet_id': rn['id'],
-              'date_from': rn['date_from'] ?? '',
-              'date_to': rn['date_to'] ?? '',
-              'ar_no': rn['ar_no'] ?? '',
-              'dr_no': rn['dr_no'] ?? '',
-              'est_tot_cbm': rn['est_tot_cbm'] ?? '',
-              'est_tot_pcs': rn['est_tot_pcs'] ?? '',
-              'est_tot_wt': rn['est_tot_wt'] ?? '',
-              'est_tot_sqm': rn['est_tot_sqm'] ?? '',
-              'plate_no': rn['plate_no'] ?? '',
-              'plate_id': driver['plate_id'] ?? '',
-              'reference': rn['reference'] ?? '',
-              'remarks': rn['remarks'] ?? '',
-              'status': rn['status'] ?? ''
+
+    try {
+      apiService.getData('runsheet', params: params).then((response) {
+        var result = json.decode(response.body);
+        print(result['data']);
+
+        if (result['success'] == true) {
+          List<dynamic> options = List<Map<String, dynamic>>.from(result['data']);
+          List<Trip> list = options.map((option) => Trip.fromJson(option)).toList();
+          List<Map<String, dynamic>> runsheet = [];
+          List<Map<String, dynamic>> bookingList = [];
+          List<int> idsToKeep = [];
+          List<int> bookingIds = [];
+
+          for (var ls in list) {
+            idsToKeep.add(ls.id);
+            var trip = {
+              'runsheet_id': ls.id,
+              'reference': ls.reference,
+              'date_from': ls.scheduleFrom,
+              'date_to': ls.scheduleTo,
+              'status': ls.status,
+              'plate_no': ls.plateNo
             };
-          }).toList();
-          if (runsheetList.isNotEmpty) {
-            dbHelper.save('runsheet', runsheetList, pkey: 'reference');
+
+            runsheet.add(trip);
+
+            for (var booking in ls.booking) {
+              bookingIds.add(booking.bookingId);
+              var item = {
+                'runsheet_id': booking.runsheetId,
+                'booking_id': booking.bookingId,
+                'customer': booking.customer,
+                'delivery_expected_date': booking.deliveryExpectedDate,
+                'delivery_city': booking.deliveryCity,
+                "delivery_name": booking.deliveryName,
+                'delivery_other_address': booking.deliveryOtherAddress,
+                "delivery_contact_no": booking.deliveryContactNo,
+                "delivery_contact_person": booking.deliveryContactPerson,
+                'item_cbm': booking.totalCbm,
+                'item_qty': booking.totalQty,
+                'item_sqm': booking.totalSqm,
+                'item_weight': booking.totalWt,
+                "pickup_city": booking.pickupCity,
+                "pickup_contact_no": booking.pickupContactNo,
+                "pickup_contact_person": booking.pickupContactPerson,
+                "pickup_expected_date": booking.pickupExpectedDate,
+                "pickup_name": booking.pickupName,
+                "pickup_other_address": booking.pickupOtherAddress,
+                'reference': booking.reference,
+                'remarks': booking.remarks,
+                'status': booking.status,
+                'status_name': booking.statusName,
+                'task': booking.task,
+              };
+              bookingList.add(item);
+            }
           }
-        } else {
-          print('Error: $response');
+          // print(runsheet);
+          // print(bookingIds);
+
+          if (runsheet.isNotEmpty) {
+            dbHelper.save('runsheet', runsheet, pkey: 'runsheet_id');
+            dbHelper.save('booking', bookingList, pkey: 'booking_id');
+            dbHelper.deleteDataNotIn('runsheet', 'runsheet_id', idsToKeep);
+            dbHelper.deleteDataNotIn('booking', 'booking_id', bookingIds);
+          } else {
+            dbHelper.truncateTable('runsheet');
+          }
         }
-      } else {
-        print('Error: $response');
-      }
-    }).catchError((error) {
-      print(error);
-    });
+      });
+    } catch (e) {
+      throw Exception('Failed to fetch trip: $e');
+    }
   }
 }

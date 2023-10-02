@@ -29,12 +29,12 @@ class DBHelper {
   }
 
   void _onCreate(Database db, int version) async {
-    await db.execute('CREATE TABLE attachment (id INTEGER PRIMARY KEY, attach TEXT, source_id INTEGER, task_id INTEGER)');
+    await db.execute('CREATE TABLE attachment (id INTEGER PRIMARY KEY, attach TEXT, booking_id INTEGER, runsheet_id INTEGER, task_code TEXT)');
     await db.execute('CREATE TABLE tasks (id INTEGER PRIMARY KEY, code TEXT, name TEXT, sequence_no INTEGER, task TEXT)');
     await db.execute('CREATE TABLE exception (id INTEGER PRIMARY KEY, code TEXT, name TEXT, description TEXT, task_id INTEGER)');
-    await db.execute('CREATE TABLE runsheet (id INTEGER PRIMARY KEY, runsheet_id INTEGER ,monitor_id INTEGER, plate_id INTEGER, date_from TEXT, date_to TEXT, ar_no TEXT, dr_no TEXT, est_tot_cbm REAL, est_tot_pcs INTEGER, est_tot_wt REAL, est_tot_sqm REAL, plate_no TEXT, reference TEXT, remarks TEXT, status TEXT)');
-    await db.execute('CREATE TABLE booking (id INTEGER PRIMARY KEY, source_id INTEGER, runsheet_id INTEGER, address TEXT, pickup_other_address TEXT, pickup_expected_date TEXT, customer_contact TEXT, task TEXT, customer TEXT, remarks TEXT, pickup_loc TEXT,delivery_loc TEXT, delivery_other_address TEXT, delivery_expected_date TEXT, reference TEXT, item_cbm REAL, item_height REAL, item_length REAL, item_width REAL, item_qty INTEGER, item_weight INTEGER, status TEXT, sequence_no INTEGER, fixed TEXT, line_id INTEGER)');
-    await db.execute('CREATE TABLE booking_logs (id INTEGER PRIMARY KEY, task TEXT, task_type TEXT, task_code TEXT, contact_person TEXT, receive_by TEXT, datetime TEXT, note TEXT, line_id INTEGER, source_id INTEGER, monitor_id INTEGER, task_id INTEGER, task_exception TEXT, flag INTEGER)');
+    await db.execute('CREATE TABLE runsheet (id INTEGER PRIMARY KEY, runsheet_id INTEGER, date_from TEXT, date_to TEXT, plate_no TEXT, reference TEXT, status TEXT)');
+    await db.execute('CREATE TABLE booking (id INTEGER PRIMARY KEY, booking_id INTEGER, runsheet_id INTEGER, customer TEXT, delivery_expected_date TEXT, delivery_city TEXT, delivery_name TEXT, delivery_other_address TEXT, delivery_contact_no TEXT, delivery_contact_person TEXT, item_cbm REAL, item_qty REAL, item_sqm REAL, item_weight REAL, pickup_contact_no TEXT, pickup_contact_person TEXT, pickup_city TEXT, pickup_expected_date TEXT, pickup_name TEXT, pickup_other_address TEXT, reference TEXT, remarks TEXT, status TEXT, status_name TEXT, task TEXT, sequence_no INTEGER)');
+    await db.execute('CREATE TABLE booking_logs (id INTEGER PRIMARY KEY, task TEXT, task_type TEXT, task_code TEXT, contact_person TEXT, receive_by TEXT, datetime TEXT, note TEXT, booking_id INTEGER, runsheet_id INTEGER, task_exception TEXT, flag INTEGER)');
   }
 
   save(String table, data, {String? pkey}) async {
@@ -104,31 +104,31 @@ class DBHelper {
         result = await dbClient.query(table,
             columns: [
               'id',
-              'source_id',
               'runsheet_id',
-              'address',
-              'pickup_other_address',
-              'pickup_expected_date',
-              'customer_contact',
-              'task',
+              'booking_id',
               'customer',
-              'remarks',
-              'pickup_loc',
-              'delivery_loc',
-              'delivery_other_address',
               'delivery_expected_date',
-              'reference',
+              'delivery_city',
+              'delivery_name',
+              'delivery_other_address',
+              'delivery_contact_no',
+              'delivery_contact_person',
               'item_cbm',
-              'item_height',
-              'item_length',
-              'item_width',
               'item_qty',
+              'item_sqm',
               'item_weight',
+              'pickup_city',
+              'pickup_contact_no',
+              'pickup_contact_person',
+              'pickup_expected_date',
+              'pickup_name',
+              'pickup_other_address',
+              'reference',
+              'remarks',
               'status',
-              'sequence_no',
-              'fixed',
-              'line_id',
-              "(SELECT bk.status from $table as bk WHERE bk.source_id = $table.source_id AND bk.task = 'PICKUP') as pick_stat"
+              'status_name',
+              'task',
+              "(SELECT bk.status from $table as bk WHERE bk.runsheet_id = $table.runsheet_id AND bk.task = 'PICKUP') as pick_stat"
             ],
             where: whereCondition,
             whereArgs: whereArgs,
@@ -193,6 +193,24 @@ class DBHelper {
     } else {
       return null;
     }
+  }
+
+  Future<void> deleteMultipleData(List<int> idsToDelete) async {
+    var dbClient = await db;
+    // Specify the table name and the WHERE clause with an IN condition.
+    const tableName = 'runsheet';
+    final whereClause = 'runsheet_id IN (${idsToDelete.map((id) => '?').join(', ')})';
+    final whereArgs = idsToDelete;
+    await dbClient.delete(tableName, where: whereClause, whereArgs: whereArgs);
+  }
+
+  Future<void> deleteDataNotIn(String table, String id, List<int> idsToKeep) async {
+    var dbClient = await db;
+    // Specify the table name and the WHERE clause with a NOT IN condition.
+    final whereClause = '$id NOT IN (${idsToKeep.map((id) => '?').join(', ')})';
+    final whereArgs = idsToKeep; // List of id values to keep.
+    // Execute the raw SQL query to delete rows not in the specified list.
+    await dbClient.rawDelete('DELETE FROM $table WHERE $whereClause', whereArgs);
   }
 }
 

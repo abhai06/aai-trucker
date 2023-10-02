@@ -67,6 +67,7 @@ class ApiService {
 
     var url = Uri.parse('$baseUrl/$apiUrl').replace(queryParameters: params != null ? _getQueryParams(params) : params);
     return http.get(url, headers: headers);
+    // return json.decode(response.body);
   }
 
   Map<String, String> _getQueryParams(Object params) {

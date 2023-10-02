@@ -10,14 +10,13 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:drive/services/api_service.dart';
 
-class ExceptionPage extends StatefulWidget {
-  final item;
-  const ExceptionPage(this.item, {Key? key}) : super(key: key);
+class FeedbackPage extends StatefulWidget {
+  const FeedbackPage({Key? key}) : super(key: key);
   @override
-  State<ExceptionPage> createState() => _ExceptionPageState();
+  State<FeedbackPage> createState() => _FeedbackPageState();
 }
 
-class _ExceptionPageState extends State<ExceptionPage> {
+class _FeedbackPageState extends State<FeedbackPage> {
   final ApiService apiService = ApiService();
   DBHelper dbHelper = DBHelper();
   List data = [];
@@ -25,25 +24,11 @@ class _ExceptionPageState extends State<ExceptionPage> {
   final TextEditingController note = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
-  bool _isLoading = true;
+  final bool _isLoading = true;
 
   final ImagePicker _picker = ImagePicker();
   List<File>? selectedImages = [];
   var attach = [];
-  Future<void> exception() async {
-    _isLoading = true;
-    final List<Map<String, dynamic>> rows = await dbHelper.getAll('exception');
-    if (mounted) {
-      setState(() {
-        data = rows;
-      });
-    }
-
-    setState(() {
-      _isLoading = false;
-    });
-  }
-
   @override
   void initState() {
     super.initState();
@@ -59,20 +44,6 @@ class _ExceptionPageState extends State<ExceptionPage> {
   Widget build(BuildContext context) {
     return Scaffold(
         resizeToAvoidBottomInset: false,
-        appBar: AppBar(
-          title: const Text('Irregularities'),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: Center(
-                child: Text(
-                  widget.item['reference'] ?? '',
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ),
-            ),
-          ],
-        ),
         body: SingleChildScrollView(
             child: Form(
                 key: _formKey,
@@ -83,7 +54,7 @@ class _ExceptionPageState extends State<ExceptionPage> {
                     const Column(
                       mainAxisAlignment: MainAxisAlignment.start,
                       children: [
-                        Text('Please enter irregularities on your trip.', textAlign: TextAlign.start, style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold)),
+                        Text('Enter your comments here.', textAlign: TextAlign.start, style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold)),
                       ],
                     ),
                     const SizedBox(height: 40.0),
@@ -187,7 +158,7 @@ class _ExceptionPageState extends State<ExceptionPage> {
                     TextFormField(
                       validator: customValidator,
                       controller: note,
-                      decoration: const InputDecoration(labelText: 'Enter Remarks', border: OutlineInputBorder(), hintText: 'Enter Remarks'),
+                      decoration: const InputDecoration(labelText: 'Enter comments', border: OutlineInputBorder(), hintText: 'Enter comments'),
                     ),
                     const SizedBox(height: 20.0),
                     ElevatedButton.icon(
@@ -203,11 +174,9 @@ class _ExceptionPageState extends State<ExceptionPage> {
                           if (_formKey.currentState!.validate()) {
                             final remarks = {
                               'remarks': note.text,
-                              'booking_id': widget.item['booking_id'],
-                              'runsheet_id': widget.item['runsheet_id'],
                               'attachment': attach
                             };
-                            await apiService.post(remarks, 'bookingRemarks').then((response) {
+                            await apiService.post(remarks, 'feedback').then((response) {
                               if (response['success'] == true) {
                                 setState(() {
                                   note.clear();
