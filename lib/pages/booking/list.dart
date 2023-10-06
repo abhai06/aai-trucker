@@ -659,7 +659,7 @@ class _BookingListPageState extends State<BookingListPage> with SingleTickerProv
                                                             fontWeight: FontWeight.bold,
                                                             color: Colors.red,
                                                           ))))
-                                              : (item['status'] == 'Assigned' || item['status'] == 'PAT')
+                                              : (item['status'] == 'Assigned' || item['status'] == 'PAT' || item['status'] == 'BTT' || item['status'] == 'ATI')
                                                   ? Row(
                                                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                                       children: [
