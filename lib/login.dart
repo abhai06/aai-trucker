@@ -77,46 +77,53 @@ class _LoginPageState extends State<LoginPage> {
         'password': _passwordController.text,
         'device': 'mobile'
       };
-      await apiService.postData(data, 'login').then((res) async {
-        if (res['success'] == true) {
-          SharedPreferences prefs = await SharedPreferences.getInstance();
-          res['data']['plate_no'] = res['data']['record']['plate_no'];
-          res['data']['trucker'] = res['data']['record']['trucker_company'];
-          res['data']['driver_contact'] = res['data']['record']['name'];
-          prefs.setString('token', res['data']['api_token']);
-          prefs.setBool('isLoggedIn', true);
-          prefs.setString('user', json.encode(res['data']));
-          await apiService.getData('app-version').then((v) async {
-            final responseData = json.decode(v.body.toString());
-            if (responseData['success'] == true) {
-              var data = responseData['data'];
-              latestVersion = data['version'];
-              url = data['url_link'];
+      try {
+        await apiService.postData(data, 'login').then((res) async {
+          if (res != null) {
+            if (res['success'] == true) {
+              SharedPreferences prefs = await SharedPreferences.getInstance();
+              res['data']['plate_no'] = res['data']['record']['plate_no'];
+              res['data']['trucker'] = res['data']['record']['trucker_company'];
+              res['data']['driver_contact'] = res['data']['record']['name'];
+              res['data']['type'] = res['data']['record']['type'];
+              prefs.setString('token', res['data']['api_token']);
+              prefs.setBool('isLoggedIn', true);
+              prefs.setString('user', json.encode(res['data']));
+              await apiService.getData('app-version').then((v) async {
+                final responseData = json.decode(v.body.toString());
+                if (responseData['success'] == true) {
+                  var data = responseData['data'];
+                  latestVersion = data['version'];
+                  url = data['url_link'];
 
-              setState(() {
-                if (_appVersion.toString() != latestVersion.toString()) {
-                  appUpdate(context, url);
-                } else {
-                  _isLoading = false;
-                  _usernameController.clear();
-                  _passwordController.clear();
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const WelcomePage()));
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    backgroundColor: Colors.green,
-                    content: Text('Login Successfully'),
-                    behavior: SnackBarBehavior.floating,
-                  ));
+                  setState(() {
+                    if (_appVersion.toString() != latestVersion.toString()) {
+                      appUpdate(context, url);
+                    } else {
+                      _isLoading = false;
+                      _usernameController.clear();
+                      _passwordController.clear();
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => const WelcomePage()));
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        backgroundColor: Colors.green,
+                        content: Text('Login Successfully'),
+                        behavior: SnackBarBehavior.floating,
+                      ));
+                    }
+                  });
                 }
               });
+            } else {
+              setState(() {
+                _isLoading = false;
+                _showLoginError(res['message']);
+              });
             }
-          });
-        } else {
-          setState(() {
-            _isLoading = false;
-            _showLoginError(res['message']);
-          });
-        }
-      });
+          }
+        });
+      } catch (e) {
+        print('Error during login: $e');
+      }
     }
   }
 
@@ -210,20 +217,21 @@ class _LoginPageState extends State<LoginPage> {
                           controller: _usernameController,
                           keyboardType: TextInputType.text,
                           decoration: InputDecoration(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 18.0),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(90.0),
+                              borderRadius: BorderRadius.circular(20.0),
                             ),
-                            labelText: 'USERNAME',
+                            labelText: 'Username',
                             labelStyle: const TextStyle(color: Colors.black),
                             prefixIcon: const Icon(Icons.person, size: 24),
                             prefixIconColor: Colors.black,
                             enabledBorder: OutlineInputBorder(
-                              borderSide: const BorderSide(color: Colors.black, width: 2.0),
-                              borderRadius: BorderRadius.circular(70.0),
+                              borderSide: const BorderSide(color: Colors.black, width: 1.0),
+                              borderRadius: BorderRadius.circular(20.0),
                             ),
                             focusedBorder: OutlineInputBorder(
-                              borderSide: const BorderSide(color: Colors.red, width: 2.0),
-                              borderRadius: BorderRadius.circular(70.0),
+                              borderSide: const BorderSide(color: Colors.red, width: 1.0),
+                              borderRadius: BorderRadius.circular(20.0),
                             ),
                             suffixIcon: _showClearIcon
                                 ? IconButton(
@@ -241,10 +249,11 @@ class _LoginPageState extends State<LoginPage> {
                           style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
                           obscureText: _obscured,
                           decoration: InputDecoration(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 18.0),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(90.0),
+                              borderRadius: BorderRadius.circular(20.0),
                             ),
-                            labelText: 'PASSWORD',
+                            labelText: 'Password',
                             labelStyle: const TextStyle(color: Colors.black),
                             prefixIcon: const Icon(Icons.lock_rounded, size: 24),
                             suffixIcon: Padding(
@@ -256,12 +265,12 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             prefixIconColor: Colors.black,
                             enabledBorder: OutlineInputBorder(
-                              borderSide: const BorderSide(color: Colors.black, width: 2.0),
-                              borderRadius: BorderRadius.circular(70.0),
+                              borderSide: const BorderSide(color: Colors.black, width: 1.0),
+                              borderRadius: BorderRadius.circular(20.0),
                             ),
                             focusedBorder: OutlineInputBorder(
-                              borderSide: const BorderSide(color: Colors.red, width: 2.0),
-                              borderRadius: BorderRadius.circular(70.0),
+                              borderSide: const BorderSide(color: Colors.red, width: 1.0),
+                              borderRadius: BorderRadius.circular(20.0),
                             ),
                           ),
                         ),

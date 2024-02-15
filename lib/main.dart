@@ -8,6 +8,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:path/path.dart';
 import 'package:pusher_channels_flutter/pusher_channels_flutter.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -23,6 +24,7 @@ import 'package:drive/services/api_service.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+PusherChannelsFlutter pusher = PusherChannelsFlutter.getInstance();
 
 void main() async {
   await dotenv.load();
@@ -51,7 +53,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  PusherChannelsFlutter pusher = PusherChannelsFlutter.getInstance();
+  // PusherChannelsFlutter pusher = PusherChannelsFlutter.getInstance();
   Service service = Service();
   late BuildContext dialogContext;
   Timer? _timer;
@@ -94,29 +96,54 @@ class _MyAppState extends State<MyApp> {
     initialization();
     openDatabaseOrInitialize();
     checkLoggedIn();
-    // initPusher();
+    // _startTimer();
+    initPusher();
+  }
+
+  void _startTimer() {
+    // Set up a recurring timer to trigger every 45 minutes
+    _timer = Timer.periodic(const Duration(minutes: 45), (Timer timer) {
+      // The timer callback will be executed every 45 minutes
+      _showNotification();
+      // You can also update the app's status here
+    });
+  }
+
+  void _showNotification() async {
+    const AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
+      'alarm_notification_channel_id',
+      'Alarm Notification Channel',
+      importance: Importance.high,
+      priority: Priority.high,
+      enableVibration: true,
+    );
+    const NotificationDetails platformChannelSpecifics = NotificationDetails(android: androidPlatformChannelSpecifics);
+
+    await flutterLocalNotificationsPlugin.show(
+      0, // Notification ID
+      'EA.GES.202300493',
+      'Status update is required for this shipment.',
+      platformChannelSpecifics,
+      payload: 'alarm_notification_payload',
+    );
   }
 
   void initPusher() async {
-    await pusher.init(
-      apiKey: dotenv.env['PUSHER_APP_KEY'].toString(),
-      cluster: dotenv.env['PUSHER_APP_CLUSTER'].toString(),
-      onConnectionStateChange: onConnectionStateChange,
-      onError: onError,
-      onSubscriptionSucceeded: onSubscriptionSucceeded,
-      onEvent: onEvent,
-      onSubscriptionError: onSubscriptionError,
-      onDecryptionFailure: onDecryptionFailure,
-      onMemberAdded: onMemberAdded,
-      onMemberRemoved: onMemberRemoved,
-      activityTimeout: 120000,
-      pongTimeout: 30000,
-    );
-    await pusher.subscribe(channelName: "mobile");
-    await pusher.connect();
+    try {
+      await pusher.init(
+        apiKey: dotenv.env['PUSHER_APP_KEY'].toString(),
+        cluster: dotenv.env['PUSHER_APP_CLUSTER'].toString(),
+      );
+      await pusher.connect();
+      final myChannel = await pusher.subscribe(channelName: 'mobile', onEvent: onEvent);
+    } catch (e) {
+      print("ERROR: $e");
+    }
   }
 
   void onEvent(PusherEvent event) {
+    print("onEvent: $event");
+    _showNotification();
     if (event.eventName == driver['plate_no']) {
       Map<String, dynamic> data = jsonDecode(event.data);
       if (data.isNotEmpty) {
@@ -131,6 +158,10 @@ class _MyAppState extends State<MyApp> {
 
   void onConnectionStateChange(dynamic currentState, dynamic previousState) {
     print("Connection: $currentState");
+    if (currentState == 'CONNECTED') {
+      // Subscribe to a channel after reconnection
+      pusher.subscribe(channelName: 'mobile');
+    }
   }
 
   void onSubscriptionSucceeded(String channelName, dynamic data) {

@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:drive/connectivity_service.dart';
 import 'package:drive/helper/db_helper.dart';
 import 'package:drive/services/api_service.dart';
@@ -13,10 +13,21 @@ class Service {
   Runsheet runsheet = Runsheet();
   ConnectivityService connectivity = ConnectivityService();
   DBHelper dbHelper = DBHelper();
+  String driver_name = "";
+  String helper_name = "";
+  dynamic driver = {};
+
   List addTaskLogs = [];
   Future<void> syncData() async {
     bool isConnected = await connectivity.isConnected();
     if (isConnected) {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      final userdata = prefs.getString('user');
+      if (userdata != "") {
+        driver = json.decode(userdata!);
+        driver_name = driver['driver_name']!;
+        helper_name = driver['helper_name']!;
+      }
       final rows = await dbHelper.getAll('booking_logs',
           whereCondition: 'flag = ?',
           whereArgs: [
@@ -53,8 +64,11 @@ class Service {
             'runsheet': data['runsheet_id'],
             'status': data['task_code'],
             'transact_with': data['contact_person'],
-            'skip_status': true
+            'skip_status': true,
+            'driver': driver_name,
+            'helper': helper_name
           };
+          print(taskLog);
           apiService.post(taskLog, 'bookingStatusLogs').then((response) {
             if (response['success'] == true) {
               dbHelper.update(

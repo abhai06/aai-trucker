@@ -31,7 +31,7 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
   late Map<String, dynamic> monitor;
   TextEditingController search = TextEditingController();
   String searchQuery = '';
-  String? plateNo;
+  String plateNo = '';
 
   @override
   void initState() {
@@ -71,13 +71,14 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
       });
     }
     DateTime currentDate = DateTime.now();
-    final today = "${currentDate.year}-${currentDate.month.toString().padLeft(2, '0')}-${currentDate.day.toString().padLeft(2, '0')} 00:00:00";
+    final start = "${currentDate.year}-${currentDate.month.toString().padLeft(2, '0')}-${currentDate.day.toString().padLeft(2, '0')} 00:00:00";
+    final end = "${currentDate.year}-${currentDate.month.toString().padLeft(2, '0')}-${currentDate.day.toString().padLeft(2, '0')} 23:59:59";
     if (_selectedTabIndex == 0) {
       var dataList = await dbHelper.getAll('runsheet',
           whereCondition: "plate_no = ? AND date_from < ?",
           whereArgs: [
             plateNo,
-            today
+            start
           ],
           orderBy: 'date_from DESC');
       if (mounted) {
@@ -87,11 +88,11 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
       }
     } else {
       var dataList = await dbHelper.getAll('runsheet',
-          whereCondition: "plate_no = ? AND date_from <= ? AND date_to >= ?",
+          whereCondition: "plate_no = ? AND date_from >= ?",
           whereArgs: [
             plateNo,
-            today,
-            today
+            start
+            // end
           ],
           orderBy: 'date_from DESC');
       if (mounted) {
@@ -221,7 +222,6 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
                             Navigator.push(context, MaterialPageRoute(builder: (context) => BookingListPage(my_task[index])));
                           });
                         },
-                        // leading: const Icon(Icons.confirmation_number, color: Colors.grey),
                         title: Text(
                           item['reference'] ?? '',
                           style: TextStyle(color: Colors.red.shade900, fontWeight: FontWeight.bold, fontSize: 18.0),
