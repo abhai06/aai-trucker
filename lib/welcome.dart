@@ -31,6 +31,11 @@ class _WelcomePageState extends State<WelcomePage> {
   Tasklist tasklist = Tasklist();
   Exceptionlist exceptionlist = Exceptionlist();
   TextEditingController plate = TextEditingController();
+  final helper = TextEditingController();
+  final driverName = TextEditingController();
+  bool _showClearIcon = false;
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
   String? selectedPlate;
   String plate_no = "";
   List runsheetList = [];
@@ -45,6 +50,8 @@ class _WelcomePageState extends State<WelcomePage> {
     if (userdata != "") {
       setState(() {
         driver = json.decode(userdata!);
+        driverName.text = (driver['type'] == 'Driver') ? driver['name'] : "";
+        helper.text = (driver['type'] == 'Helper') ? driver['name'] : "";
         plate.text = driver['plate_no'] ?? '';
       });
       final task = {
@@ -53,6 +60,7 @@ class _WelcomePageState extends State<WelcomePage> {
       };
       runsheet.runsheet();
       tasklist.tasklist(task);
+      plateList(driver['plate_no']);
       setState(() {
         _isLoading = false;
       });
@@ -72,6 +80,13 @@ class _WelcomePageState extends State<WelcomePage> {
       selectedPlate = null;
       plate_no = "";
       plate.clear();
+    });
+  }
+
+  void _clearText() {
+    setState(() {
+      helper.clear();
+      _showClearIcon = false;
     });
   }
 
@@ -96,7 +111,7 @@ class _WelcomePageState extends State<WelcomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        resizeToAvoidBottomInset: false,
+        resizeToAvoidBottomInset: true,
         body: _isLoading
             ? Center(
                 child: Lottie.asset(
@@ -107,16 +122,22 @@ class _WelcomePageState extends State<WelcomePage> {
                   width: 100,
                 ),
               )
-            : Container(
-                decoration: const BoxDecoration(image: DecorationImage(image: AssetImage('assets/images/maps.jpg'), fit: BoxFit.cover, opacity: 0.3)),
-                padding: const EdgeInsets.all(8.0),
+            : SingleChildScrollView(
+                child: Container(
+                    // decoration: const BoxDecoration(image: DecorationImage(image: AssetImage('assets/images/maps.jpg'), fit: BoxFit.cover, opacity: 0.3)),
+                    // padding: const EdgeInsets.all(8.0),
+                    // child: SingleChildScrollView(
+                    // child: Padding(
+                    //     padding: const EdgeInsets.all(12.0),
+                    child: Form(
+                key: _formKey,
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.start,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const SizedBox(height: 50),
+                    const SizedBox(height: 80),
                     Text(
-                      "Welcome ${driver['name']?.toUpperCase()}! \n",
+                      "${driver['trucker']?.toUpperCase()}! \n",
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 25,
@@ -128,7 +149,7 @@ class _WelcomePageState extends State<WelcomePage> {
                       style: TextStyle(fontSize: 18),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 50),
+                    const SizedBox(height: 30),
                     Lottie.asset(
                       "assets/animations/driver.json",
                       animate: true,
@@ -136,25 +157,134 @@ class _WelcomePageState extends State<WelcomePage> {
                       height: 150,
                       width: 150,
                     ),
-                    const SizedBox(height: 50),
+                    const SizedBox(height: 30),
                     Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.only(
+                          left: 16.0,
+                          right: 16.0,
+                          top: 4.0,
+                          bottom: 16.0,
+                        ),
                         width: 300,
-                        child: OutlinedButton.icon(
-                            icon: const Icon(Icons.local_shipping),
-                            style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.red,
-                                minimumSize: const Size.fromHeight(45),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                )),
-                            label: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text("PLATE NO : ${driver['plate_no']}"),
+                        child: TypeAheadField<PlateNo>(
+                          hideKeyboard: true,
+                          textFieldConfiguration: TextFieldConfiguration(
+                              controller: plate,
+                              decoration: InputDecoration(
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 18.0),
+                                labelText: 'PLATE NO',
+                                hintText: 'PLATE NO',
+                                labelStyle: const TextStyle(color: Colors.red),
+                                border: const OutlineInputBorder(),
+                                suffixIcon: plate.text.isNotEmpty
+                                    ? IconButton(
+                                        icon: const Icon(Icons.clear),
+                                        onPressed: _clearPlate,
+                                      )
+                                    : null,
+                              ),
+                              style: const TextStyle(
+                                fontSize: 16.0,
+                                color: Colors.black,
+                              )),
+                          suggestionsCallback: (String pattern) async {
+                            return await plateList(pattern);
+                          },
+                          itemBuilder: (context, PlateNo suggestion) {
+                            return ListTile(
+                              title: Text("${suggestion.plate_no} - ${suggestion.type}"),
+                            );
+                          },
+                          onSuggestionSelected: (PlateNo suggestion) {
+                            setState(() {
+                              plate.text = suggestion.plate_no;
+                            });
+                          },
+                        )),
+                    Container(
+                        padding: const EdgeInsets.only(
+                          left: 16.0,
+                          right: 16.0,
+                          top: 4.0,
+                          bottom: 0.0,
+                        ),
+                        width: 300,
+                        child: TextFormField(
+                          enabled: (driver['type'] == 'Driver') ? false : true,
+                          style: const TextStyle(height: 0.6),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Driver is required';
+                            }
+                            return null;
+                          },
+                          controller: driverName,
+                          keyboardType: TextInputType.text,
+                          decoration: InputDecoration(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 18.0),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10.0),
                             ),
-                            onPressed: () async {
-                              _selectDialog();
-                            })),
+                            labelText: 'DRIVER NAME',
+                            labelStyle: const TextStyle(color: Colors.red, fontSize: 13.0),
+                            enabledBorder: OutlineInputBorder(
+                              borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                              borderRadius: BorderRadius.circular(10.0),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: const BorderSide(color: Colors.red, width: 1.0),
+                              borderRadius: BorderRadius.circular(10.0),
+                            ),
+                            suffixIcon: _showClearIcon
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear, color: Colors.red),
+                                    onPressed: _clearText,
+                                  )
+                                : null,
+                          ),
+                        )),
+                    Container(
+                        padding: EdgeInsets.only(
+                          left: 16.0,
+                          right: 16.0,
+                          top: 8.0,
+                          bottom: 4.0,
+                        ),
+                        width: 300,
+                        child: TextFormField(
+                          enabled: (driver['type'] == 'Helper') ? false : true,
+                          style: const TextStyle(height: 0.6),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Helper is required';
+                            }
+                            return null;
+                          },
+                          controller: helper,
+                          keyboardType: TextInputType.text,
+                          decoration: InputDecoration(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 18.0),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10.0),
+                            ),
+                            labelText: 'HELPER NAME',
+                            labelStyle: const TextStyle(color: Colors.red, fontSize: 13.0),
+                            enabledBorder: OutlineInputBorder(
+                              borderSide: const BorderSide(color: Colors.grey, width: 1.0),
+                              borderRadius: BorderRadius.circular(10.0),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: const BorderSide(color: Colors.red, width: 1.0),
+                              borderRadius: BorderRadius.circular(10.0),
+                            ),
+                            suffixIcon: _showClearIcon
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear, color: Colors.red),
+                                    onPressed: _clearText,
+                                  )
+                                : null,
+                          ),
+                        )),
                     Container(
                         padding: const EdgeInsets.all(16),
                         width: 300,
@@ -175,12 +305,26 @@ class _WelcomePageState extends State<WelcomePage> {
                               if (!isConnected) {
                                 ConnectivityService.noInternetDialog(context);
                               } else {
-                                Navigator.push(context, MaterialPageRoute(builder: (context) => const MainScreen()));
+                                if (_formKey.currentState!.validate() && plate.text != '') {
+                                  SharedPreferences prefs = await SharedPreferences.getInstance();
+                                  final Map<String, dynamic> user = driver;
+                                  user['driver_name'] = driverName.text.toString();
+                                  user['helper_name'] = helper.text.toString();
+                                  user['plate_no'] = plate.text.toString();
+                                  prefs.setString('user', json.encode(user));
+                                  Navigator.push(context, MaterialPageRoute(builder: (context) => const MainScreen()));
+                                } else if (plate.text == '') {
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                                    backgroundColor: Colors.red,
+                                    content: Text('Plate No is required'),
+                                    behavior: SnackBarBehavior.floating,
+                                  ));
+                                }
                               }
                             })),
                   ],
                 ),
-              ));
+              ))));
   }
 
   void _selectDialog() {
@@ -223,7 +367,7 @@ class _WelcomePageState extends State<WelcomePage> {
               },
               onSuggestionSelected: (PlateNo suggestion) {
                 setState(() {
-                  print(suggestion);
+                  // print(suggestion);
                   plate.text = suggestion.plate_no;
                 });
               },
@@ -262,5 +406,12 @@ class _WelcomePageState extends State<WelcomePage> {
         );
       },
     );
+  }
+
+  String? customValidator(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'This field cannot be empty.';
+    }
+    return null;
   }
 }

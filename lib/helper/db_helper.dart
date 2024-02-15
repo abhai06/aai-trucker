@@ -204,7 +204,7 @@ class DBHelper {
     await dbClient.delete(tableName, where: whereClause, whereArgs: whereArgs);
   }
 
-  Future<void> deleteDataNotIn(String table, String id, List<int> idsToKeep) async {
+  Future<void> deleteDataNotIn(String table, String id, List<String> idsToKeep) async {
     var dbClient = await db;
     // Specify the table name and the WHERE clause with a NOT IN condition.
     final whereClause = '$id NOT IN (${idsToKeep.map((id) => '?').join(', ')})';

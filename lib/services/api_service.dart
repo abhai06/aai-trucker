@@ -6,11 +6,15 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class ApiService {
   final baseUrl = dotenv.env['BASE_URL'];
   postData(data, apiUrl) async {
-    var response = await http.post(Uri.parse('$baseUrl/$apiUrl'), body: jsonEncode(data), headers: _setHeaders());
-    if (response.statusCode == 200) {
-      return json.decode(response.body.toString());
-    } else {
-      return 'Request failed with status: ${response.statusCode}.';
+    try {
+      var response = await http.post(Uri.parse('$baseUrl/$apiUrl'), body: jsonEncode(data), headers: _setHeaders());
+      if (response.statusCode == 200) {
+        return json.decode(response.body.toString());
+      } else {
+        return 'Request failed with status: ${response.statusCode}.';
+      }
+    } catch (e) {
+      return e;
     }
   }
 

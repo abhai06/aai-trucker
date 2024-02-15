@@ -29,18 +29,17 @@ class Runsheet {
     try {
       apiService.getData('runsheet', params: params).then((response) {
         var result = json.decode(response.body);
-        print(result['data']);
-
+        // print(result);
         if (result['success'] == true) {
           List<dynamic> options = List<Map<String, dynamic>>.from(result['data']);
           List<Trip> list = options.map((option) => Trip.fromJson(option)).toList();
           List<Map<String, dynamic>> runsheet = [];
           List<Map<String, dynamic>> bookingList = [];
-          List<int> idsToKeep = [];
-          List<int> bookingIds = [];
+          List<String> idsToKeep = [];
+          List<String> bookingIds = [];
 
           for (var ls in list) {
-            idsToKeep.add(ls.id);
+            idsToKeep.add(ls.reference);
             var trip = {
               'runsheet_id': ls.id,
               'reference': ls.reference,
@@ -53,7 +52,7 @@ class Runsheet {
             runsheet.add(trip);
 
             for (var booking in ls.booking) {
-              bookingIds.add(booking.bookingId);
+              bookingIds.add(booking.reference);
               var item = {
                 'runsheet_id': booking.runsheetId,
                 'booking_id': booking.bookingId,
@@ -83,16 +82,14 @@ class Runsheet {
               bookingList.add(item);
             }
           }
-          // print(runsheet);
-          // print(bookingIds);
-
           if (runsheet.isNotEmpty) {
-            dbHelper.save('runsheet', runsheet, pkey: 'runsheet_id');
-            dbHelper.save('booking', bookingList, pkey: 'booking_id');
-            dbHelper.deleteDataNotIn('runsheet', 'runsheet_id', idsToKeep);
-            dbHelper.deleteDataNotIn('booking', 'booking_id', bookingIds);
+            dbHelper.save('runsheet', runsheet, pkey: 'reference');
+            dbHelper.save('booking', bookingList, pkey: 'reference');
+            dbHelper.deleteDataNotIn('runsheet', 'reference', idsToKeep);
+            dbHelper.deleteDataNotIn('booking', 'reference', bookingIds);
           } else {
             dbHelper.truncateTable('runsheet');
+            dbHelper.truncateTable('booking');
           }
         }
       });
