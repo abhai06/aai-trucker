@@ -1,12 +1,14 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+// import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiService {
-  final baseUrl = dotenv.env['BASE_URL'];
+  // String? baseUrl = dotenv.env['BASE_URL'];
   postData(data, apiUrl) async {
     try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      final String? baseUrl = prefs.getString('BASE_URL');
       var response = await http.post(Uri.parse('$baseUrl/$apiUrl'), body: jsonEncode(data), headers: _setHeaders());
       if (response.statusCode == 200) {
         return json.decode(response.body.toString());
@@ -22,6 +24,7 @@ class ApiService {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       final String? bearerToken = prefs.getString('token');
+      final String? baseUrl = prefs.getString('BASE_URL');
       var head = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -30,11 +33,26 @@ class ApiService {
       };
       var url = (id != null && id > 0) ? '$baseUrl/$apiUrl/$id' : '$baseUrl/$apiUrl';
       var response = await http.post(Uri.parse(url), body: jsonEncode(data), headers: head);
-      // if (response.statusCode == 200) {
       return json.decode(response.body.toString());
-      // } else {
-      //   return response.statusCode;
-      // }
+    } catch (e) {
+      return e;
+    }
+  }
+
+  Future<dynamic> put(data, apiUrl, {int? id}) async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      final String? bearerToken = prefs.getString('token');
+      final String? baseUrl = prefs.getString('BASE_URL');
+
+      var head = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Charset': 'utf-8',
+        'Authorization': 'Bearer $bearerToken',
+      };
+      var url = (id != null && id > 0) ? '$baseUrl/$apiUrl/$id' : '$baseUrl/$apiUrl';
+      return await http.post(Uri.parse(url), body: jsonEncode(data), headers: head);
     } catch (e) {
       return e;
     }
@@ -43,6 +61,7 @@ class ApiService {
   getRecordById(apiUrl, id) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     final String? bearerToken = prefs.getString('token');
+    final String? baseUrl = prefs.getString('BASE_URL');
 
     final headers = {
       'Content-Type': 'application/json',
@@ -61,6 +80,7 @@ class ApiService {
     dynamic body,
   }) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? baseUrl = prefs.getString('BASE_URL');
     final String? bearerToken = prefs.getString('token');
     final headers = {
       'Content-Type': 'application/json',
@@ -71,7 +91,6 @@ class ApiService {
 
     var url = Uri.parse('$baseUrl/$apiUrl').replace(queryParameters: params != null ? _getQueryParams(params) : params);
     return http.get(url, headers: headers);
-    // return json.decode(response.body);
   }
 
   Map<String, String> _getQueryParams(Object params) {

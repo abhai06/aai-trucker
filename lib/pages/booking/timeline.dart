@@ -5,6 +5,9 @@ import 'package:lottie/lottie.dart';
 import 'package:timeline_tile/timeline_tile.dart';
 import 'package:drive/helper/db_helper.dart';
 import 'package:drive/connectivity_service.dart';
+import 'package:drive/services/api_service.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:intl/intl.dart';
 
 class Timeline extends StatefulWidget {
   final item;
@@ -16,28 +19,31 @@ class Timeline extends StatefulWidget {
 class _TimelineState extends State<Timeline> {
   DBHelper dbHelper = DBHelper();
   ConnectivityService connectivity = ConnectivityService();
+  ApiService apiService = ApiService();
 
   List events = [];
   bool isLoading = false;
   Future<List<dynamic>> logs() async {
-    setState(() {
-      isLoading = true;
-    });
-    final log = await dbHelper.getAll('booking_logs',
-        whereCondition: 'booking_id = ?',
-        whereArgs: [
-          widget.item['booking_id']
-        ],
-        orderBy: 'id DESC');
-    events = log;
-    setState(() {
-      isLoading = false;
-    });
-    return events;
+    try {
+      final res = await apiService.getData('getStatus', params: {
+        'booking_id': widget.item['booking_id'] ?? '',
+        'runsheet_id': widget.item['runsheet_id'] ?? ''
+      });
+      if (res.statusCode == 200) {
+        var data = jsonDecode(res.body);
+        return List<dynamic>.from(data['data']);
+      } else {
+        throw Exception('Failed to load logs');
+      }
+    } catch (e) {
+      print(e);
+      return events;
+    }
   }
 
   @override
   void initState() {
+    logs();
     super.initState();
   }
 
@@ -65,114 +71,101 @@ class _TimelineState extends State<Timeline> {
             ),
           ],
         ),
-        body: isLoading
-            ? Center(
-                child: Lottie.asset(
-                  "assets/animations/spinner.json",
+        body: FutureBuilder<List<dynamic>>(
+            future: logs(),
+            builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Center(
+                    child: SpinKitFadingCircle(
+                  color: Colors.red.shade900,
+                ));
+              } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                return ListView.builder(
+                    itemCount: snapshot.data!.length,
+                    itemBuilder: (context, int index) {
+                      final history = snapshot.data![index];
+                      DateTime stat = DateTime.parse(history['datetime'] ?? '');
+                      final statusDate = DateFormat('MMM d,yyyy HH:mm').format(stat);
+                      return TimelineTile(
+                        alignment: TimelineAlign.manual,
+                        lineXY: 0.1,
+                        endChild: Container(
+                          constraints: const BoxConstraints(
+                            minHeight: 50,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ListTile(
+                                title: Text(
+                                  history['status'] ?? '',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(history['status_name'] ?? '', style: const TextStyle(fontSize: 12)),
+                                    Text(statusDate, style: const TextStyle(fontSize: 15, color: Colors.red, fontWeight: FontWeight.bold)),
+                                    Text((history['status'] == 'TDD') ? 'Receive By : ${history['transact_with'] ?? ''}' : '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                    Text(history['notes'] ?? '', style: const TextStyle(fontSize: 12, overflow: TextOverflow.ellipsis))
+                                  ],
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      margin: const EdgeInsets.only(left: 5),
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: (history['task'] == 'DELIVERY') ? Colors.green : Colors.blue,
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        history['task'] ?? '',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    )
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          // ),
+                        ),
+                        isFirst: false,
+                        indicatorStyle: IndicatorStyle(
+                          width: 40,
+                          color: Colors.green,
+                          padding: const EdgeInsets.all(8),
+                          iconStyle: IconStyle(
+                            color: Colors.white,
+                            iconData: Icons.check,
+                          ),
+                        ),
+                        beforeLineStyle: const LineStyle(color: Colors.green, thickness: 2),
+                        afterLineStyle: const LineStyle(color: Colors.green, thickness: 2),
+                      );
+                    });
+              } else if (snapshot.hasError) {
+                return Text('${snapshot.error}');
+              } else {
+                return Center(
+                    child: Lottie.asset(
+                  "assets/animations/noitem.json",
                   animate: true,
                   alignment: Alignment.center,
-                  height: 100,
-                  width: 100,
-                ),
-              )
-            : FutureBuilder<List<dynamic>>(
-                future: logs(),
-                builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
-                  if (events.isNotEmpty) {
-                    return ListView.builder(
-                        itemCount: events.length,
-                        itemBuilder: (context, int index) {
-                          final history = events[index];
-                          // final signature = history['signature'] ?? '';
-                          int flag = history['flag'] ?? 0;
-                          return TimelineTile(
-                            alignment: TimelineAlign.manual,
-                            lineXY: 0.1,
-                            endChild: Container(
-                              constraints: const BoxConstraints(
-                                minHeight: 50,
-                              ),
-                              // color: Colors.lightGreenAccent,
-                              // child: Padding(
-                              //   padding: const EdgeInsets.all(8.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  ListTile(
-                                    title: Text(
-                                      history['task_code'],
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    subtitle: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          history['task'],
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                        Text(
-                                          history['datetime'] ?? '',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                        Text(
-                                          history['note'],
-                                          style: const TextStyle(fontSize: 12, overflow: TextOverflow.ellipsis),
-                                        ),
-                                        Text(
-                                          (history['task_code'] == 'TDD') ? 'Receive By : ${history['contact_person'] ?? ''}' : '',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                          ),
-                                        )
-                                      ],
-                                    ),
-                                    // trailing: GestureDetector(
-                                    //     onTap: () {
-                                    //       _showSignature(context, signature);
-                                    //     },
-                                    //     child: (history['task_code'] == 'FIU')
-                                    //         ? Icon(Icons.draw,
-                                    //             color: Colors.grey)
-                                    //         : Text(''))
-                                  ),
-                                ],
-                              ),
-                              // ),
-                            ),
-                            isFirst: false,
-                            indicatorStyle: IndicatorStyle(
-                              width: 40,
-                              color: (flag == 1) ? Colors.green : Colors.blue,
-                              padding: const EdgeInsets.all(8),
-                              iconStyle: IconStyle(
-                                color: Colors.white,
-                                iconData: (flag == 1) ? Icons.check : Icons.sync,
-                              ),
-                            ),
-                            beforeLineStyle: const LineStyle(color: Colors.red, thickness: 3),
-                            afterLineStyle: const LineStyle(color: Colors.red, thickness: 3),
-                          );
-                        });
-                  } else if (snapshot.hasError) {
-                    return Text('${snapshot.error}');
-                  } else {
-                    return Center(
-                        child: Lottie.asset(
-                      "assets/animations/noitem.json",
-                      animate: true,
-                      alignment: Alignment.center,
-                      height: 300,
-                      width: 300,
-                    ));
-                  }
-                }));
+                  height: 300,
+                  width: 300,
+                ));
+              }
+            }));
   }
 
   Future<void> _showSignature(BuildContext context, sign) async {

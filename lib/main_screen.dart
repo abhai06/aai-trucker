@@ -11,6 +11,7 @@ import 'package:package_info/package_info.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:drive/plateno.dart';
 import 'package:intl/intl.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
@@ -31,6 +32,8 @@ class _MainScreenState extends State<MainScreen> {
   String currentPageTitle = 'My Task';
   Map<String, dynamic> driver = {};
   String _appVersion = '';
+  String driver_name = '';
+  String helper_name = '';
 
   final helperName = TextEditingController();
   final driverName = TextEditingController();
@@ -72,6 +75,8 @@ class _MainScreenState extends State<MainScreen> {
     if (userdata != null) {
       setState(() {
         driver = json.decode(userdata);
+        driver_name = (driver['driver_name'] != null) ? driver_name.toUpperCase() : '';
+        helper_name = (driver['helper_name'] != null) ? driver_name.toUpperCase() : '';
         _appVersion = packageInfo.version;
       });
     }
@@ -128,11 +133,11 @@ class _MainScreenState extends State<MainScreen> {
               children: [
                 UserAccountsDrawerHeader(
                   accountName: Text(
-                    "Driver : ${driver['driver_name'].toUpperCase()}",
+                    "Driver : ${driver['driver_name']}",
                     style: const TextStyle(fontSize: 16, color: Colors.white),
                   ),
                   accountEmail: Text(
-                    "Helper : ${driver['helper_name'].toUpperCase()}",
+                    "Helper : ${driver['helper_name']}",
                     style: const TextStyle(color: Colors.white, fontSize: 16.0),
                   ),
                   currentAccountPicture: Container(
@@ -251,7 +256,7 @@ class _MainScreenState extends State<MainScreen> {
                                         Navigator.of(context).pop();
                                       },
                                       style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.red.shade300,
+                                          backgroundColor: Colors.white,
                                           minimumSize: const Size.fromHeight(40),
                                           shape: RoundedRectangleBorder(
                                             borderRadius: BorderRadius.circular(20),
@@ -260,7 +265,7 @@ class _MainScreenState extends State<MainScreen> {
                                           fit: BoxFit.scaleDown,
                                           child: Text(
                                             'Cancel',
-                                            style: TextStyle(color: Colors.white),
+                                            style: TextStyle(color: Colors.black),
                                           )))),
                               const SizedBox(width: 8.0),
                               Expanded(
@@ -297,7 +302,10 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> resetPreferences() async {
     SharedPreferences preferences = await SharedPreferences.getInstance();
+    String baseUrl = preferences.getString('BASE_URL') ?? '';
+    await OneSignal.logout();
     await preferences.clear();
+    await preferences.setString('BASE_URL', baseUrl);
   }
 
   String? customValidator(String? value) {
@@ -363,7 +371,6 @@ class _MainScreenState extends State<MainScreen> {
                         ),
                         const SizedBox(height: 8.0),
                         TextFormField(
-                          enabled: (driver['type'] == 'Driver') ? false : true,
                           style: const TextStyle(height: 0.6),
                           validator: customValidator,
                           controller: driverName,
@@ -387,7 +394,6 @@ class _MainScreenState extends State<MainScreen> {
                         ),
                         const SizedBox(height: 8.0),
                         TextFormField(
-                            enabled: (driver['type'] == 'Helper') ? false : true,
                             style: const TextStyle(height: 0.6),
                             validator: customValidator,
                             controller: helperName,

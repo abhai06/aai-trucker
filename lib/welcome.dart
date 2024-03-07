@@ -5,16 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:drive/helper/db_helper.dart';
 import 'package:drive/main_screen.dart';
 import 'package:drive/services/api_service.dart';
 import 'package:drive/plateno.dart';
-
-import 'package:drive/pages/runsheet.dart';
-import 'package:drive/pages/tasklist.dart';
-import 'package:drive/pages/exceptionlist.dart';
 import 'package:drive/connectivity_service.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 
 class WelcomePage extends StatefulWidget {
   const WelcomePage({Key? key}) : super(key: key);
@@ -26,10 +23,6 @@ class WelcomePage extends StatefulWidget {
 class _WelcomePageState extends State<WelcomePage> {
   final ApiService apiService = ApiService();
   ConnectivityService connectivity = ConnectivityService();
-  DBHelper dbHelper = DBHelper();
-  Runsheet runsheet = Runsheet();
-  Tasklist tasklist = Tasklist();
-  Exceptionlist exceptionlist = Exceptionlist();
   TextEditingController plate = TextEditingController();
   final helper = TextEditingController();
   final driverName = TextEditingController();
@@ -54,12 +47,6 @@ class _WelcomePageState extends State<WelcomePage> {
         helper.text = (driver['type'] == 'Helper') ? driver['name'] : "";
         plate.text = driver['plate_no'] ?? '';
       });
-      final task = {
-        'itemsPerPage': '-1',
-        'group_by': '4'
-      };
-      runsheet.runsheet();
-      tasklist.tasklist(task);
       plateList(driver['plate_no']);
       setState(() {
         _isLoading = false;
@@ -114,21 +101,12 @@ class _WelcomePageState extends State<WelcomePage> {
         resizeToAvoidBottomInset: true,
         body: _isLoading
             ? Center(
-                child: Lottie.asset(
-                  "assets/animations/loading.json",
-                  animate: true,
-                  alignment: Alignment.center,
-                  height: 100,
-                  width: 100,
-                ),
-              )
+                child: SpinKitFadingCircle(
+                color: Colors.red.shade900,
+                size: 50.0,
+              ))
             : SingleChildScrollView(
                 child: Container(
-                    // decoration: const BoxDecoration(image: DecorationImage(image: AssetImage('assets/images/maps.jpg'), fit: BoxFit.cover, opacity: 0.3)),
-                    // padding: const EdgeInsets.all(8.0),
-                    // child: SingleChildScrollView(
-                    // child: Padding(
-                    //     padding: const EdgeInsets.all(12.0),
                     child: Form(
                 key: _formKey,
                 child: Column(
@@ -210,7 +188,6 @@ class _WelcomePageState extends State<WelcomePage> {
                         ),
                         width: 300,
                         child: TextFormField(
-                          enabled: (driver['type'] == 'Driver') ? false : true,
                           style: const TextStyle(height: 0.6),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
@@ -244,7 +221,7 @@ class _WelcomePageState extends State<WelcomePage> {
                           ),
                         )),
                     Container(
-                        padding: EdgeInsets.only(
+                        padding: const EdgeInsets.only(
                           left: 16.0,
                           right: 16.0,
                           top: 8.0,
@@ -252,7 +229,6 @@ class _WelcomePageState extends State<WelcomePage> {
                         ),
                         width: 300,
                         child: TextFormField(
-                          enabled: (driver['type'] == 'Helper') ? false : true,
                           style: const TextStyle(height: 0.6),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
@@ -308,10 +284,11 @@ class _WelcomePageState extends State<WelcomePage> {
                                 if (_formKey.currentState!.validate() && plate.text != '') {
                                   SharedPreferences prefs = await SharedPreferences.getInstance();
                                   final Map<String, dynamic> user = driver;
-                                  user['driver_name'] = driverName.text.toString();
-                                  user['helper_name'] = helper.text.toString();
+                                  user['driver_name'] = (driverName.text == '') ? driver['driver_name'] : driverName.text.toString();
+                                  user['helper_name'] = (helper.text == '') ? driver['driver_name'] : helper.text.toString();
                                   user['plate_no'] = plate.text.toString();
                                   prefs.setString('user', json.encode(user));
+                                  OneSignal.login(plate.text.toString());
                                   Navigator.push(context, MaterialPageRoute(builder: (context) => const MainScreen()));
                                 } else if (plate.text == '') {
                                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -397,7 +374,6 @@ class _WelcomePageState extends State<WelcomePage> {
                 prefs.setString('user', json.encode(user));
                 setState(() {
                   driver = user;
-                  runsheet.runsheet();
                 });
                 Navigator.of(context).pop();
               },

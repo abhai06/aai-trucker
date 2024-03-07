@@ -26,6 +26,7 @@ class _ExceptionPageState extends State<ExceptionPage> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   bool _isLoading = true;
+  bool isSaved = false;
 
   final ImagePicker _picker = ImagePicker();
   List<File>? selectedImages = [];
@@ -199,36 +200,49 @@ class _ExceptionPageState extends State<ExceptionPage> {
                             )),
                         label: const Text('SUBMIT'),
                         icon: const Icon(Icons.save),
-                        onPressed: () async {
-                          if (_formKey.currentState!.validate()) {
-                            final remarks = {
-                              'remarks': note.text,
-                              'booking_id': widget.item['booking_id'],
-                              'runsheet_id': widget.item['runsheet_id'],
-                              'attachment': attach
-                            };
-                            await apiService.post(remarks, 'bookingRemarks').then((response) {
-                              if (response['success'] == true) {
-                                setState(() {
-                                  note.clear();
-                                  attach.clear();
-                                  selectedImages!.clear();
-                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                                    backgroundColor: Colors.green,
-                                    content: Text('Remarks sent successfully'),
-                                    behavior: SnackBarBehavior.fixed,
-                                  ));
-                                });
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                                  backgroundColor: Colors.red,
-                                  content: Text('Remarks not sent.'),
-                                  behavior: SnackBarBehavior.floating,
-                                ));
-                              }
-                            });
-                          }
-                        }),
+                        onPressed: isSaved
+                            ? null
+                            : () async {
+                                if (_formKey.currentState!.validate()) {
+                                  setState(() {
+                                    isSaved = true;
+                                  });
+                                  final remarks = {
+                                    'remarks': note.text,
+                                    'booking_id': widget.item['booking_id'],
+                                    'runsheet_id': widget.item['runsheet_id'],
+                                    'attachment': attach
+                                  };
+                                  await apiService.post(remarks, 'bookingRemarks').then((response) {
+                                    if (response['success'] == true) {
+                                      setState(() {
+                                        isSaved = false;
+                                        note.clear();
+                                        attach.clear();
+                                        selectedImages!.clear();
+                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                                          backgroundColor: Colors.green,
+                                          content: Text('Remarks sent successfully'),
+                                          behavior: SnackBarBehavior.fixed,
+                                        ));
+                                      });
+                                    } else {
+                                      setState(() {
+                                        isSaved = false;
+                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                                          backgroundColor: Colors.red,
+                                          content: Text('Remarks not sent.'),
+                                          behavior: SnackBarBehavior.floating,
+                                        ));
+                                      });
+                                    }
+                                  });
+                                } else {
+                                  setState(() {
+                                    isSaved = false;
+                                  });
+                                }
+                              }),
                   ]),
                 ))));
   }

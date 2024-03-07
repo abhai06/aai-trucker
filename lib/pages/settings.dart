@@ -28,6 +28,7 @@ class _SettingsPageState extends State<SettingsPage> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   final bool _isLoading = true;
+  bool isSaving = false;
 
   final ImagePicker _picker = ImagePicker();
   FocusNode textFieldFocusNode = FocusNode();
@@ -128,7 +129,7 @@ class _SettingsPageState extends State<SettingsPage> {
                             contentPadding: const EdgeInsets.symmetric(horizontal: 18.0),
                             labelText: 'New Password',
                             border: const OutlineInputBorder(),
-                            hintText: 'Enter Current Password',
+                            hintText: 'Enter New Password',
                             suffixIcon: Padding(
                               padding: const EdgeInsets.fromLTRB(0, 0, 4, 0),
                               child: GestureDetector(
@@ -175,39 +176,49 @@ class _SettingsPageState extends State<SettingsPage> {
                                 )),
                             label: const Text('SAVE'),
                             icon: const Icon(Icons.save),
-                            onPressed: () async {
-                              if (_formKey.currentState!.validate()) {
-                                final password = {
-                                  'old_password': oldPassword.text,
-                                  'password': newPassword.text,
-                                  'password_confirmation': confirmPassword.text
-                                };
-                                try {
-                                  await apiService.post(password, 'change-password').then((response) {
-                                    if (response['success'] == true) {
+                            onPressed: isSaving
+                                ? null
+                                : () async {
+                                    if (_formKey.currentState!.validate()) {
                                       setState(() {
-                                        oldPassword.clear();
-                                        newPassword.clear();
-                                        confirmPassword.clear();
-                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                                          backgroundColor: Colors.green,
-                                          content: Text('Password change successfully'),
-                                          behavior: SnackBarBehavior.fixed,
-                                        ));
+                                        isSaving = true;
                                       });
-                                    } else {
-                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                        backgroundColor: Colors.red,
-                                        content: Text((response['message']!)),
-                                        behavior: SnackBarBehavior.floating,
-                                      ));
+                                      final password = {
+                                        'old_password': oldPassword.text,
+                                        'password': newPassword.text,
+                                        'password_confirmation': confirmPassword.text
+                                      };
+                                      try {
+                                        await apiService.post(password, 'change-password').then((response) {
+                                          if (response['success'] == true) {
+                                            setState(() {
+                                              isSaving = false;
+                                              oldPassword.clear();
+                                              newPassword.clear();
+                                              confirmPassword.clear();
+                                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                                                backgroundColor: Colors.green,
+                                                content: Text('Password change successfully'),
+                                                behavior: SnackBarBehavior.fixed,
+                                              ));
+                                            });
+                                          } else {
+                                            setState(() {
+                                              isSaving = false;
+                                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                                backgroundColor: Colors.red,
+                                                content: Text((response['message']!)),
+                                                behavior: SnackBarBehavior.floating,
+                                              ));
+                                            });
+                                          }
+                                        });
+                                      } catch (e) {
+                                        isSaving = false;
+                                        print(e);
+                                      }
                                     }
-                                  });
-                                } catch (e) {
-                                  print(e);
-                                }
-                              }
-                            }),
+                                  }),
                       ]),
                     )))));
   }

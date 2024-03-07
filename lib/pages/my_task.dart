@@ -11,6 +11,7 @@ import 'package:drive/helper/db_helper.dart';
 import 'package:drive/pages/booking/list.dart';
 import 'package:drive/pages/runsheet.dart';
 import 'package:drive/services/api_service.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 
 class MyTaskPage extends StatefulWidget {
   const MyTaskPage({Key? key}) : super(key: key);
@@ -35,8 +36,6 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
 
   @override
   void initState() {
-    runsheet.runsheet();
-    fetchData();
     _tabController = TabController(
       length: 2,
       vsync: this,
@@ -59,152 +58,86 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
     });
   }
 
-  Future<List<Map<String, dynamic>>> fetchData() async {
-    _isLoading = true;
-    await Future.delayed(const Duration(seconds: 2));
+  Future<List<dynamic>> getTrips() async {
+    
     SharedPreferences prefs = await SharedPreferences.getInstance();
     final userdata = prefs.getString('user');
     if (userdata != null) {
-      setState(() {
-        var user = json.decode(userdata);
-        plateNo = user['plate_no'] ?? '';
-      });
+      var user = json.decode(userdata);
+      plateNo = user['plate_no'] ?? '';
     }
-    DateTime currentDate = DateTime.now();
-    final start = "${currentDate.year}-${currentDate.month.toString().padLeft(2, '0')}-${currentDate.day.toString().padLeft(2, '0')} 00:00:00";
-    final end = "${currentDate.year}-${currentDate.month.toString().padLeft(2, '0')}-${currentDate.day.toString().padLeft(2, '0')} 23:59:59";
-    if (_selectedTabIndex == 0) {
-      var dataList = await dbHelper.getAll('runsheet',
-          whereCondition: "plate_no = ? AND date_from < ?",
-          whereArgs: [
-            plateNo,
-            start
-          ],
-          orderBy: 'date_from DESC');
-      if (mounted) {
-        setState(() {
-          my_task = dataList;
-        });
-      }
-    } else {
-      var dataList = await dbHelper.getAll('runsheet',
-          whereCondition: "plate_no = ? AND date_from >= ?",
-          whereArgs: [
-            plateNo,
-            start
-            // end
-          ],
-          orderBy: 'date_from DESC');
-      if (mounted) {
-        setState(() {
-          my_task = dataList;
-        });
-      }
-    }
-
-    _isLoading = false;
-    return my_task;
-  }
-
-  void _clearSearch() {
-    setState(() {
-      searchQuery = '';
-      search.clear();
+    final res = await apiService.getData('getTrip', params: {
+      'plate_no': plateNo,
+      'type': _selectedTabIndex
     });
+    if (res.statusCode == 200) {
+      var data = jsonDecode(res.body);
+      List<dynamic> trip = List<dynamic>.from(data['data']);
+      return trip;
+    } else {
+      throw Exception('Failed to load trips');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: false,
-      body: Container(
-          decoration: const BoxDecoration(image: DecorationImage(image: AssetImage('assets/images/maps.jpg'), fit: BoxFit.cover, opacity: 0.3)),
-          padding: const EdgeInsets.all(8.0),
-          child: Column(mainAxisAlignment: MainAxisAlignment.start, children: [
-            TextField(
-              onChanged: (value) {
-                setState(() {
-                  searchQuery = value.toLowerCase();
-                });
-              },
-              controller: search,
-              decoration: InputDecoration(
-                contentPadding: const EdgeInsets.all(4.0),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(70.0),
-                ),
-                hintText: 'Search...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear, color: Colors.red),
-                        onPressed: () {
-                          _clearSearch();
-                        })
-                    : null,
-              ),
+        resizeToAvoidBottomInset: false,
+        body: Container(
+            decoration: const BoxDecoration(image: DecorationImage(image: AssetImage('assets/images/maps.jpg'), fit: BoxFit.cover, opacity: 0.3)),
+            padding: const EdgeInsets.all(8.0),
+            child: Column(mainAxisAlignment: MainAxisAlignment.start, children: [
+              Expanded(
+                  child: TabBarView(controller: _tabController, children: [
+                previousTab(),
+                todayTab()
+              ]))
+            ])),
+        bottomNavigationBar: BottomAppBar(
+          color: Colors.grey.shade900,
+          child: TabBar(
+            onTap: (int) {
+              setState(() {
+                _selectedTabIndex = int;
+                _isLoading = false;
+                getTrips();
+              });
+            },
+            indicator: BoxDecoration(
+              color: Colors.red.shade900,
             ),
-            const SizedBox(height: 2.0),
-            Expanded(
-                child: TabBarView(controller: _tabController, children: [
-              previousTab(),
-              todayTab()
-            ]))
-          ])),
-      bottomNavigationBar: BottomAppBar(
-        color: Colors.grey.shade900,
-        child: TabBar(
-          onTap: (int) {
-            setState(() {
-              _selectedTabIndex = int;
-              _isLoading = false;
-              fetchData();
-            });
-          },
-          indicator: BoxDecoration(
-            color: Colors.red.shade900,
+            indicatorColor: Colors.white,
+            indicatorWeight: 4.0,
+            controller: _tabController,
+            labelColor: Colors.white,
+            dividerColor: Colors.white,
+            tabs: const [
+              Tab(text: "PREVIOUS", icon: Icon(Icons.event_repeat)),
+              Tab(text: "TODAY", icon: Icon(Icons.today)),
+            ],
           ),
-          indicatorColor: Colors.white,
-          indicatorWeight: 4.0,
-          controller: _tabController,
-          labelColor: Colors.white,
-          dividerColor: Colors.white,
-          tabs: const [
-            Tab(text: "PREVIOUS", icon: Icon(Icons.event_repeat)),
-            Tab(text: "TODAY", icon: Icon(Icons.today)),
-          ],
-        ),
-      ),
-      floatingActionButton: Container(
-          margin: const EdgeInsets.only(bottom: 10.0),
-          child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, crossAxisAlignment: CrossAxisAlignment.end, children: [
-            FloatingActionButton(
-                hoverColor: Colors.green,
-                backgroundColor: Colors.blue,
-                onPressed: () {
-                  runsheet.runsheet();
-                },
-                child: const Icon(Icons.refresh, size: 30.0))
-          ])),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-    );
+        ));
   }
 
   Widget previousTab() {
     return FutureBuilder<List<dynamic>>(
-        future: fetchData(),
+        future: getTrips(),
         builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
-          final previousList = my_task.where((itm) => itm['reference'].toLowerCase().contains(searchQuery)).toList();
-          if (previousList.isNotEmpty) {
+          // final previousList = my_task.where((itm) => itm['reference'].toLowerCase().contains(searchQuery)).toList();
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(
+                child: SpinKitFadingCircle(
+              color: Colors.red.shade900,
+              size: 50.0,
+            ));
+          } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
             return ListView.builder(
                 padding: const EdgeInsets.all(4),
-                itemCount: previousList.length,
+                itemCount: snapshot.data!.length,
                 itemBuilder: (context, index) {
-                  final item = previousList[index];
-                  DateTime dateFrom = DateTime.parse(item['date_from'] ?? '');
-                  final from = DateFormat('MMM d,yyyy h:mm a').format(dateFrom);
-                  DateTime dateTo = DateTime.parse(item['date_to'] ?? '');
-                  final to = DateFormat('MMM d,yyyy h:mm a').format(dateTo);
+                  final item = snapshot.data![index];
+                  DateTime dateFrom = DateTime.parse(item['schedule_from'] ?? '');
+                  final from = DateFormat('MMM d,yyyy').format(dateFrom);
                   final TextEditingController estTotWt = TextEditingController(text: "");
                   final TextEditingController estTotSqm = TextEditingController(text: "");
                   final TextEditingController estTotPcs = TextEditingController(text: "");
@@ -219,20 +152,17 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
                         selectedTileColor: Colors.red.shade100,
                         onTap: () {
                           setState(() {
-                            Navigator.push(context, MaterialPageRoute(builder: (context) => BookingListPage(my_task[index])));
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => BookingListPage(item)));
                           });
                         },
+                        leading: const Icon(Icons.local_shipping, color: Colors.grey),
                         title: Text(
                           item['reference'] ?? '',
                           style: TextStyle(color: Colors.red.shade900, fontWeight: FontWeight.bold, fontSize: 18.0),
                         ),
                         subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Text(
-                            'FR :  $from',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
-                          Text(
-                            'TO : $to',
+                            from,
                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                           Row(children: [
@@ -243,7 +173,7 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
                                   TextField(
                                     controller: estTotCbm,
                                     readOnly: true,
-                                    decoration: const InputDecoration(labelText: 'Est. CBM', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
+                                    decoration: const InputDecoration(labelText: 'CBM', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
                                     style: const TextStyle(fontSize: 11),
                                   ),
                                 ],
@@ -261,7 +191,7 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
                                     controller: estTotSqm,
                                     readOnly: true,
                                     keyboardType: TextInputType.text,
-                                    decoration: const InputDecoration(labelText: 'Est. SQM', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
+                                    decoration: const InputDecoration(labelText: 'SQM', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
                                     style: const TextStyle(fontSize: 11),
                                   ),
                                 ],
@@ -279,7 +209,7 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
                                     controller: estTotPcs,
                                     readOnly: true,
                                     keyboardType: TextInputType.text,
-                                    decoration: const InputDecoration(labelText: 'Est. PCS', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
+                                    decoration: const InputDecoration(labelText: 'PCS', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
                                     style: const TextStyle(fontSize: 11),
                                   ),
                                 ],
@@ -297,7 +227,7 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
                                     controller: estTotWt,
                                     readOnly: true,
                                     keyboardType: TextInputType.text,
-                                    decoration: const InputDecoration(labelText: 'Est. Wt', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
+                                    decoration: const InputDecoration(labelText: 'WT', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
                                     style: const TextStyle(fontSize: 11),
                                   ),
                                 ],
@@ -348,19 +278,22 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
 
   Widget todayTab() {
     return FutureBuilder<List<dynamic>>(
-        future: fetchData(),
+        future: getTrips(),
         builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
-          final todayList = my_task.where((itm) => itm['reference'].toLowerCase().contains(searchQuery)).toList();
-          if (todayList.isNotEmpty) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(
+                child: SpinKitFadingCircle(
+              color: Colors.red.shade900,
+              size: 50.0,
+            ));
+          } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
             return ListView.builder(
                 padding: const EdgeInsets.all(4),
-                itemCount: todayList.length,
+                itemCount: snapshot.data!.length,
                 itemBuilder: (context, index) {
-                  final item = todayList[index];
-                  DateTime dateFrom = DateTime.parse(item['date_from'] ?? '');
-                  final from = DateFormat('MMM d,yyyy h:mm a').format(dateFrom);
-                  DateTime dateTo = DateTime.parse(item['date_to'] ?? '');
-                  final to = DateFormat('MMM d,yyyy h:mm a').format(dateTo);
+                  final item = snapshot.data![index];
+                  DateTime dateFrom = DateTime.parse(item['schedule_from'] ?? '');
+                  final from = DateFormat('MMM d,yyyy').format(dateFrom);
                   final TextEditingController estTotWt = TextEditingController(text: "");
                   final TextEditingController estTotSqm = TextEditingController(text: "");
                   final TextEditingController estTotPcs = TextEditingController(text: "");
@@ -374,21 +307,17 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
                       child: ListTile(
                         onTap: () {
                           setState(() {
-                            Navigator.push(context, MaterialPageRoute(builder: (context) => BookingListPage(my_task[index])));
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => BookingListPage(item)));
                           });
                         },
-                        // leading: const Icon(Icons.confirmation_number, color: Colors.grey),
+                        leading: const Icon(Icons.local_shipping, color: Colors.blue),
                         title: Text(
                           item['reference'] ?? '',
                           style: TextStyle(color: Colors.red.shade900, fontWeight: FontWeight.bold),
                         ),
                         subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Text(
-                            'FR :  $from',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
-                          Text(
-                            'TO : $to',
+                            from,
                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                           Row(children: [
@@ -399,7 +328,7 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
                                   TextField(
                                     controller: estTotCbm,
                                     readOnly: true,
-                                    decoration: const InputDecoration(labelText: 'Est. CBM', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
+                                    decoration: const InputDecoration(labelText: 'CBM', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
                                     style: const TextStyle(fontSize: 11),
                                   ),
                                 ],
@@ -417,7 +346,7 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
                                     controller: estTotSqm,
                                     readOnly: true,
                                     keyboardType: TextInputType.text,
-                                    decoration: const InputDecoration(labelText: 'Est. SQM', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
+                                    decoration: const InputDecoration(labelText: 'SQM', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
                                     style: const TextStyle(fontSize: 11),
                                   ),
                                 ],
@@ -435,7 +364,7 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
                                     controller: estTotPcs,
                                     readOnly: true,
                                     keyboardType: TextInputType.text,
-                                    decoration: const InputDecoration(labelText: 'Est. PCS', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
+                                    decoration: const InputDecoration(labelText: 'PCS', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
                                     style: const TextStyle(fontSize: 11),
                                   ),
                                 ],
@@ -453,7 +382,7 @@ class _MyTaskPageState extends State<MyTaskPage> with SingleTickerProviderStateM
                                     controller: estTotWt,
                                     readOnly: true,
                                     keyboardType: TextInputType.text,
-                                    decoration: const InputDecoration(labelText: 'Est. Wt', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
+                                    decoration: const InputDecoration(labelText: 'Wt', labelStyle: TextStyle(fontWeight: FontWeight.bold)),
                                     style: const TextStyle(fontSize: 11),
                                   ),
                                 ],

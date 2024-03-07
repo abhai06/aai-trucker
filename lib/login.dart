@@ -7,6 +7,8 @@ import 'package:drive/welcome.dart';
 import 'services/api_service.dart';
 import 'package:package_info/package_info.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -28,7 +30,7 @@ class _LoginPageState extends State<LoginPage> {
   String latestVersion = '';
   String url = '';
   bool _isLoading = false;
-
+  String? baseUrl;
   @override
   void initState() {
     super.initState();
@@ -68,20 +70,20 @@ class _LoginPageState extends State<LoginPage> {
     if (!isConnected) {
       ConnectivityService.noInternetDialog(context);
     } else {
-      setState(() {
-        _isLoading = true;
-      });
-      await Future.delayed(const Duration(seconds: 2));
-      var data = {
-        'username': _usernameController.text,
-        'password': _passwordController.text,
-        'device': 'mobile'
-      };
       try {
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        setState(() {
+          _isLoading = true;
+        });
+        await Future.delayed(const Duration(seconds: 2));
+        var data = {
+          'username': _usernameController.text,
+          'password': _passwordController.text,
+          'device': 'mobile'
+        };
         await apiService.postData(data, 'login').then((res) async {
           if (res != null) {
             if (res['success'] == true) {
-              SharedPreferences prefs = await SharedPreferences.getInstance();
               res['data']['plate_no'] = res['data']['record']['plate_no'];
               res['data']['trucker'] = res['data']['record']['trucker_company'];
               res['data']['driver_contact'] = res['data']['record']['name'];
